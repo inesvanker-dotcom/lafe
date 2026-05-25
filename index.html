@@ -1,0 +1,1667 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>La Fé — Gestión</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,600;0,900;1,300&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg: #F5F0E8;
+  --surface: #FEFCF7;
+  --surface2: #EDE8DC;
+  --border: #D4CDB8;
+  --text: #1A1714;
+  --text2: #6B6355;
+  --accent: #2D5016;
+  --accent2: #8B4513;
+  --accent3: #1A3A5C;
+  --gold: #C8961E;
+  --red: #8B1A1A;
+  --green: #2D5016;
+  --yellow: #7A6010;
+  --radius: 4px;
+  --shadow: 0 2px 8px rgba(26,23,20,0.08);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Mono', monospace;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 13px;
+}
+
+/* NAV */
+nav {
+  background: var(--text);
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 2px solid var(--accent);
+}
+.nav-brand {
+  font-family: 'Fraunces', serif;
+  font-size: 20px;
+  font-weight: 900;
+  color: #F5F0E8;
+  padding: 14px 24px 14px 0;
+  border-right: 1px solid #333;
+  margin-right: 8px;
+  letter-spacing: -0.5px;
+}
+.nav-brand span { color: var(--gold); }
+.nav-btn {
+  background: none;
+  border: none;
+  color: #A09080;
+  padding: 16px 14px;
+  cursor: pointer;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  transition: color 0.15s;
+  white-space: nowrap;
+}
+.nav-btn:hover { color: #F5F0E8; }
+.nav-btn.active { color: var(--gold); border-bottom: 2px solid var(--gold); }
+.nav-spacer { flex: 1; }
+.export-btn {
+  background: var(--accent);
+  color: #F5F0E8;
+  border: none;
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.export-btn:hover { background: #3d6b20; }
+
+/* MAIN */
+main { padding: 32px 24px; max-width: 1400px; margin: 0 auto; }
+.page { display: none; }
+.page.active { display: block; }
+
+/* TYPOGRAPHY */
+h1 {
+  font-family: 'Fraunces', serif;
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+  letter-spacing: -0.5px;
+}
+h2 {
+  font-family: 'Fraunces', serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 16px;
+  letter-spacing: -0.3px;
+}
+.page-subtitle {
+  color: var(--text2);
+  font-size: 12px;
+  margin-bottom: 28px;
+}
+
+/* CARDS */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
+}
+.card-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text2);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* GRID */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+/* STAT CARDS */
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  box-shadow: var(--shadow);
+}
+.stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); margin-bottom: 6px; }
+.stat-value { font-family: 'Fraunces', serif; font-size: 26px; font-weight: 600; color: var(--text); }
+.stat-unit { font-size: 11px; color: var(--text2); margin-left: 4px; }
+.stat-change { font-size: 11px; margin-top: 4px; }
+.stat-change.up { color: var(--green); }
+.stat-change.down { color: var(--red); }
+
+/* TABLES */
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th {
+  background: var(--surface2);
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text2);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--surface2); }
+.td-num { text-align: right; font-variant-numeric: tabular-nums; }
+.td-center { text-align: center; }
+.row-total td { background: var(--surface2); font-weight: 500; border-top: 2px solid var(--border); }
+
+/* BADGES */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+.badge-green { background: #E8F2E0; color: var(--green); }
+.badge-yellow { background: #FFF8DC; color: var(--yellow); }
+.badge-red { background: #F8E8E8; color: var(--red); }
+.badge-blue { background: #E0EAF5; color: var(--accent3); }
+.badge-gray { background: var(--surface2); color: var(--text2); }
+
+/* FORMS */
+.form-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; align-items: flex-end; }
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text2); }
+input, select, textarea {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+input[type="number"] { text-align: right; }
+.btn {
+  background: var(--accent);
+  color: #F5F0E8;
+  border: none;
+  padding: 9px 18px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  transition: background 0.15s;
+}
+.btn:hover { background: #3d6b20; }
+.btn-secondary {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover { background: var(--border); }
+.btn-danger { background: var(--red); }
+.btn-danger:hover { background: #a52020; }
+
+/* DIAS RESTANTES INDICATOR */
+.days-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.days-track {
+  flex: 1;
+  height: 4px;
+  background: var(--surface2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.days-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+.days-fill.ok { background: var(--green); }
+.days-fill.warn { background: var(--gold); }
+.days-fill.crit { background: var(--red); }
+
+/* SEMANA HEADER */
+.week-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 16px 20px;
+  background: var(--text);
+  border-radius: var(--radius);
+  color: #F5F0E8;
+}
+.week-date {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--gold);
+}
+.week-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #A09080; }
+
+/* TABS */
+.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text2);
+  margin-bottom: -1px;
+}
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ALERT STRIP */
+.alert {
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.alert-warn { background: #FFF8DC; border-left: 3px solid var(--gold); color: var(--yellow); }
+.alert-crit { background: #F8E8E8; border-left: 3px solid var(--red); color: var(--red); }
+
+/* WEEK SELECTOR */
+.week-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.week-nav button {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  cursor: pointer;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--text);
+}
+.week-nav button:hover { background: var(--border); }
+.week-nav .current-week {
+  font-family: 'Fraunces', serif;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 0 8px;
+}
+
+/* EMPTY STATE */
+.empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text2);
+}
+.empty-icon { font-size: 40px; margin-bottom: 12px; }
+.empty p { font-size: 13px; }
+
+/* SECTION DIVIDER */
+.section-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 28px 0 20px;
+}
+.section-divider h2 { margin: 0; }
+.section-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* CORRAL GRID */
+.corrales-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.corral-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  position: relative;
+}
+.corral-card.recria { border-left: 3px solid var(--accent3); }
+.corral-card.engorde-nov { border-left: 3px solid var(--accent2); }
+.corral-card.engorde-vq { border-left: 3px solid var(--gold); }
+.corral-card.adaptacion { border-left: 3px solid var(--green); }
+.corral-num {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text2);
+  margin-bottom: 4px;
+}
+.corral-total {
+  font-family: 'Fraunces', serif;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1;
+}
+.corral-cat { font-size: 10px; color: var(--text2); margin-top: 4px; }
+.corral-firmas { font-size: 10px; color: var(--text2); margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap; }
+.firma-chip {
+  background: var(--surface2);
+  padding: 2px 6px;
+  border-radius: 2px;
+  font-size: 9px;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  nav { overflow-x: auto; }
+}
+
+/* PRINT STYLES */
+@media print {
+  nav, .no-print { display: none !important; }
+  body { background: white; }
+  .card { box-shadow: none; border: 1px solid #ccc; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">La <span>Fé</span></div>
+  <button class="nav-btn active" onclick="showPage('dashboard')">Dashboard</button>
+  <button class="nav-btn" onclick="showPage('granos')">Granos y Silo</button>
+  <button class="nav-btn" onclick="showPage('hacienda')">Hacienda</button>
+  <button class="nav-btn" onclick="showPage('racion')">Ración</button>
+  <button class="nav-btn" onclick="showPage('alimentos')">Alimentos</button>
+  <button class="nav-btn" onclick="showPage('costos')">Costo Ración</button>
+  <div class="nav-spacer"></div>
+  <button class="export-btn" onclick="exportExcel()">↓ Excel</button>
+</nav>
+
+<main>
+
+<!-- ═══════════════════════════════════════════
+     DASHBOARD
+═══════════════════════════════════════════ -->
+<div id="page-dashboard" class="page active">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:6px;">
+    <div>
+      <h1>Resumen semanal</h1>
+      <p class="page-subtitle">La Fé — Feedlot</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <label style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text2);">Semana al</label>
+      <input type="date" id="dash-fecha" style="width:160px;" onchange="saveSemana()">
+    </div>
+  </div>
+
+  <div id="dash-alerts" style="margin-bottom:16px;"></div>
+
+  <!-- Hacienda stats -->
+  <div class="card-title" style="margin-bottom:12px;">Hacienda</div>
+  <div class="grid-4" style="margin-bottom:24px;">
+    <div class="stat-card">
+      <div class="stat-label">Total animales</div>
+      <div class="stat-value" id="d-total-animales">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Recría</div>
+      <div class="stat-value" id="d-recria">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Engorde</div>
+      <div class="stat-value" id="d-engorde">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Corrales activos</div>
+      <div class="stat-value" id="d-corrales">—</div>
+    </div>
+  </div>
+
+  <!-- Stock granos -->
+  <div class="card-title" style="margin-bottom:12px;">Stock de granos</div>
+  <div class="grid-4" style="margin-bottom:24px;">
+    <div class="stat-card">
+      <div class="stat-label">Silo Maíz</div>
+      <div class="stat-value" id="d-silo-maiz" style="font-size:20px;">—</div>
+      <div style="font-size:10px;color:var(--text2);">kg</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Silo Cebada</div>
+      <div class="stat-value" id="d-silo-cebada" style="font-size:20px;">—</div>
+      <div style="font-size:10px;color:var(--text2);">kg</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Maíz grano</div>
+      <div class="stat-value" id="d-maiz" style="font-size:20px;">—</div>
+      <div style="font-size:10px;color:var(--text2);">kg</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Soja</div>
+      <div class="stat-value" id="d-soja" style="font-size:20px;">—</div>
+      <div style="font-size:10px;color:var(--text2);">kg</div>
+    </div>
+  </div>
+
+  <!-- Días restantes alimentos -->
+  <div class="card-title" style="margin-bottom:12px;">Días restantes por alimento</div>
+  <div class="card">
+    <div id="dash-dias-restantes">
+      <p style="color:var(--text2);font-size:12px;">Completá la sección Alimentos para ver este resumen.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     GRANOS Y SILO
+═══════════════════════════════════════════ -->
+<div id="page-granos" class="page">
+  <h1>Granos y Silo</h1>
+  <p class="page-subtitle">Stock actual por tipo, cosecha y bolsa</p>
+
+  <!-- Agregar / editar -->
+  <div class="card no-print">
+    <div class="card-title">Registrar peso actual</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Tipo</label>
+        <select id="g-tipo">
+          <option value="Silo Maíz">Silo Maíz</option>
+          <option value="Silo Cebada">Silo Cebada</option>
+          <option value="Maíz grano">Maíz grano</option>
+          <option value="Soja">Soja</option>
+          <option value="Trigo">Trigo</option>
+          <option value="Cebada">Cebada</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Cosecha</label>
+        <select id="g-cosecha">
+          <option>2024</option><option selected>2025</option><option>2026</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Bolsa / Nombre</label>
+        <input type="text" id="g-bolsa" placeholder="Ej: Bolsa 1 (H)" style="width:160px;">
+      </div>
+      <div class="form-group">
+        <label>Ubicación</label>
+        <input type="text" id="g-ubicacion" placeholder="Lote 8" style="width:120px;">
+      </div>
+      <div class="form-group">
+        <label>Kg cosecha inicial</label>
+        <input type="number" id="g-kg-inicial" placeholder="0" style="width:130px;">
+      </div>
+      <div class="form-group">
+        <label>Peso actual (kg)</label>
+        <input type="number" id="g-peso-actual" placeholder="0" style="width:140px;">
+      </div>
+      <div class="form-group">
+        <label>Fecha</label>
+        <input type="date" id="g-fecha">
+      </div>
+      <button class="btn" onclick="addGrano()">Guardar</button>
+    </div>
+  </div>
+
+  <!-- Tabla por tipo -->
+  <div id="granos-tabla"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     HACIENDA
+═══════════════════════════════════════════ -->
+<div id="page-hacienda" class="page">
+  <h1>Hacienda</h1>
+  <p class="page-subtitle">Corrales, categorías y movimientos semanales</p>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('hacienda','corrales')">Corrales</button>
+    <button class="tab-btn" onclick="showTab('hacienda','movimientos')">Movimientos</button>
+    <button class="tab-btn" onclick="showTab('hacienda','resumen')">Resumen</button>
+  </div>
+
+  <!-- CORRALES -->
+  <div id="hacienda-corrales" class="tab-content active">
+    <div class="card no-print">
+      <div class="card-title">Cargar semana</div>
+      <div class="form-row" style="margin-bottom:8px;">
+        <div class="form-group">
+          <label>Fecha semana</label>
+          <input type="date" id="h-fecha">
+        </div>
+      </div>
+      <div id="corrales-form"></div>
+      <div style="margin-top:16px;">
+        <button class="btn" onclick="saveHacienda()">Guardar semana</button>
+      </div>
+    </div>
+
+    <div class="corrales-grid" id="corrales-display"></div>
+
+    <div class="card">
+      <div class="card-title">Totales por categoría</div>
+      <div id="hacienda-totales"></div>
+    </div>
+  </div>
+
+  <!-- MOVIMIENTOS -->
+  <div id="hacienda-movimientos" class="tab-content">
+    <div class="card">
+      <div class="card-title">Registrar movimiento</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tipo</label>
+          <select id="mov-tipo">
+            <option>Ingreso TROS</option>
+            <option>Ingreso TRAS</option>
+            <option>Venta Novillos</option>
+            <option>Venta Vaquillonas</option>
+            <option>Muerte Recría</option>
+            <option>Muerte Engorde</option>
+            <option>Nacimiento</option>
+            <option>Otro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Cantidad</label>
+          <input type="number" id="mov-cantidad" style="width:100px;">
+        </div>
+        <div class="form-group">
+          <label>Descripción</label>
+          <input type="text" id="mov-desc" style="width:280px;" placeholder="Detalle del movimiento">
+        </div>
+        <div class="form-group">
+          <label>Fecha</label>
+          <input type="date" id="mov-fecha">
+        </div>
+        <button class="btn" onclick="addMovimiento()">Registrar</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Historial de movimientos</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr><th>Fecha</th><th>Tipo</th><th class="td-num">Cantidad</th><th>Descripción</th><th></th></tr>
+          </thead>
+          <tbody id="mov-tabla"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESUMEN -->
+  <div id="hacienda-resumen" class="tab-content">
+    <div class="card">
+      <div class="card-title">Variación vs semana anterior</div>
+      <div id="hacienda-variacion"></div>
+    </div>
+    <div class="card" style="margin-top:0">
+      <div class="card-title">Notas de la semana</div>
+      <textarea id="h-notas" rows="4" style="width:100%;resize:vertical;" placeholder="Observaciones de la semana..." onchange="saveNotas()"></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     RACIÓN
+═══════════════════════════════════════════ -->
+<div id="page-racion" class="page">
+  <h1>Ración</h1>
+  <p class="page-subtitle">Dieta por categoría · Planilla empleados · Consumo total</p>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('racion','dieta')">Dieta</button>
+    <button class="tab-btn" onclick="showTab('racion','empleados')">Planilla empleados</button>
+    <button class="tab-btn" onclick="showTab('racion','consumo')">Consumo total</button>
+  </div>
+
+  <!-- DIETA -->
+  <div id="racion-dieta" class="tab-content active">
+    <div class="card">
+      <div class="card-title">Kg/animal/día por categoría</div>
+      <div class="form-row">
+        <div class="form-group"><label>Recría (kg/an)</label><input type="number" id="d-kgan-recria" value="11" step="0.1" style="width:90px;" onchange="recalcRacion()"></div>
+        <div class="form-group"><label>Engorde VQ (kg/an)</label><input type="number" id="d-kgan-engvq" value="12.5" step="0.1" style="width:90px;" onchange="recalcRacion()"></div>
+        <div class="form-group"><label>Engorde NOV (kg/an)</label><input type="number" id="d-kgan-engnov" value="13" step="0.1" style="width:90px;" onchange="recalcRacion()"></div>
+        <div class="form-group"><label>Adaptación (kg/an)</label><input type="number" id="d-kgan-adapt" value="10" step="0.1" style="width:90px;" onchange="recalcRacion()"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Composición % de dieta</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Ingrediente</th>
+              <th class="td-num">% Recría</th><th class="td-num">kg/an Recría</th>
+              <th class="td-num">% Eng VQ</th><th class="td-num">kg/an Eng VQ</th>
+              <th class="td-num">% Eng NOV</th><th class="td-num">kg/an Eng NOV</th>
+              <th class="td-num">% Adapt</th><th class="td-num">kg/an Adapt</th>
+            </tr>
+          </thead>
+          <tbody id="dieta-tabla"></tbody>
+          <tfoot id="dieta-totales"></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMPLEADOS -->
+  <div id="racion-empleados" class="tab-content">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <p style="color:var(--text2);font-size:12px;">Calculado automáticamente a partir de la dieta y los animales en Hacienda. Cantidad por comida (÷ 2).</p>
+      <button class="btn btn-secondary no-print" onclick="window.print()">🖨 Imprimir</button>
+    </div>
+    <div class="card">
+      <div class="tbl-wrap" id="empleados-tabla"></div>
+    </div>
+  </div>
+
+  <!-- CONSUMO -->
+  <div id="racion-consumo" class="tab-content">
+    <div class="card">
+      <div class="card-title">Consumo total diario y semanal</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Ingrediente</th>
+              <th class="td-num">kg/día total</th>
+              <th class="td-num">kg/semana</th>
+              <th class="td-num">kg/comida (÷2)</th>
+            </tr>
+          </thead>
+          <tbody id="consumo-tabla"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     ALIMENTOS
+═══════════════════════════════════════════ -->
+<div id="page-alimentos" class="page">
+  <h1>Alimentos</h1>
+  <p class="page-subtitle">Stock de alimentos procesados · Días restantes</p>
+
+  <div class="card no-print">
+    <div class="card-title">Actualizar stock</div>
+    <div class="form-row">
+      <div class="form-group"><label>Alimento</label>
+        <select id="al-nombre">
+          <option>Pellet GS</option><option>Núcleo Terneros</option>
+          <option>Núcleo FSU</option><option>Urea</option>
+          <option>Expeller Soja</option><option>Otro</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Stock actual (kg)</label>
+        <input type="number" id="al-stock" style="width:140px;">
+      </div>
+      <div class="form-group"><label>Ingreso esta semana (kg)</label>
+        <input type="number" id="al-ingreso" placeholder="0" style="width:140px;">
+      </div>
+      <div class="form-group"><label>Fecha</label>
+        <input type="date" id="al-fecha">
+      </div>
+      <button class="btn" onclick="saveAlimento()">Guardar</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Stock y días restantes</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Alimento</th>
+            <th class="td-num">Stock (kg)</th>
+            <th class="td-num">Consumo diario (kg)</th>
+            <th class="td-num">Consumo semanal (kg)</th>
+            <th class="td-num">Días restantes</th>
+            <th class="td-center">Estado</th>
+          </tr>
+        </thead>
+        <tbody id="alimentos-tabla"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Historial de ingresos</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Fecha</th><th>Alimento</th><th class="td-num">Kg ingresado</th><th>Notas</th></tr></thead>
+        <tbody id="alimentos-historial"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     COSTO RACIÓN
+═══════════════════════════════════════════ -->
+<div id="page-costos" class="page">
+  <h1>Costo de Ración</h1>
+  <p class="page-subtitle">Precio por ingrediente · Costo por categoría · Margen</p>
+
+  <div class="card">
+    <div class="card-title">Parámetros de la semana</div>
+    <div class="form-row">
+      <div class="form-group"><label>Dólar ($/USD)</label><input type="number" id="c-dolar" value="1394" style="width:110px;" onchange="recalcCostos()"></div>
+      <div class="form-group"><label>Precio ternero ($/kg)</label><input type="number" id="c-ptro" value="6000" style="width:110px;" onchange="recalcCostos()"></div>
+      <div class="form-group"><label>Precio ternera ($/kg)</label><input type="number" id="c-ptra" value="5700" style="width:110px;" onchange="recalcCostos()"></div>
+      <div class="form-group"><label>P° venta novillo ($/kg)</label><input type="number" id="c-pvnov" value="5000" style="width:110px;" onchange="recalcCostos()"></div>
+      <div class="form-group"><label>P° venta vaquillona ($/kg)</label><input type="number" id="c-pvvaq" value="4700" style="width:110px;" onchange="recalcCostos()"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Precio ingredientes ($/kg)</div>
+    <div id="costos-ingredientes-form" class="form-row" style="flex-wrap:wrap;"></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Novillo</div>
+      <div id="costos-novillo"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Vaquillona</div>
+      <div id="costos-vaquillona"></div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<script>
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+const STATE = {
+  semana: { fecha: new Date().toISOString().split('T')[0], notas: '' },
+  granos: [],          // [{id, tipo, cosecha, bolsa, ubicacion, kgInicial, pesoActual, fecha}]
+  hacienda: {          // corrales current week
+    fecha: new Date().toISOString().split('T')[0],
+    corrales: {},      // {1: {cat, total, five_m, five_h, mve_m, mve_h, tab_m, tab_h, pesoEst, fechaSalida}, ...}
+    corralesPrev: {},
+  },
+  movimientos: [],     // [{id, tipo, cantidad, desc, fecha}]
+  dieta: {
+    kgan: { recria:11, engvq:12.5, engnov:13, adapt:10 },
+    ingredientes: [
+      {nombre:'Pellet de Gs',    pct:{recria:12,   engvq:9,    engnov:9,   adapt:9}},
+      {nombre:'Silo Cebada',     pct:{recria:77.5, engvq:25,   engnov:25,  adapt:30}},
+      {nombre:'Silo Maíz',       pct:{recria:0,    engvq:0,    engnov:0,   adapt:0}},
+      {nombre:'Maíz grano',      pct:{recria:9,    engvq:63.7, engnov:63.7,adapt:50}},
+      {nombre:'Cebada',          pct:{recria:0,    engvq:0,    engnov:0,   adapt:0}},
+      {nombre:'Expeller Soja',   pct:{recria:0,    engvq:0,    engnov:0,   adapt:0}},
+      {nombre:'Núcleo Terneros', pct:{recria:1,    engvq:0,    engnov:0,   adapt:1}},
+      {nombre:'Núcleo FSU',      pct:{recria:0,    engvq:1.5,  engnov:1.5, adapt:0}},
+      {nombre:'Urea',            pct:{recria:0.5,  engvq:0.8,  engnov:0.8, adapt:0.5}},
+      {nombre:'Hotelería',       pct:{recria:0,    engvq:0,    engnov:0,   adapt:9.5}},
+    ]
+  },
+  alimentos: [],       // [{nombre, stock, consumoDiario, ingreso, fecha}]
+  costos: {
+    dolar: 1394, ptro: 6000, ptra: 5700, pvnov: 5000, pvvaq: 4700,
+    precios: {}        // {ingrediente: precio_por_kg}
+  }
+};
+
+const CORRALES = [1,2,3,4,5,6,7,8,9,10,11,12,'Manga'];
+const CATS = ['Recría','Engorde NOV','Engorde VQ','Adaptación',''];
+const CAT_CLASS = {'Recría':'recria','Engorde NOV':'engorde-nov','Engorde VQ':'engorde-vq','Adaptación':'adaptacion'};
+const FIRMAS = ['FIVE','MVE','TABELA'];
+
+// ═══════════════════════════════════════════════
+// PERSISTENCE
+// ═══════════════════════════════════════════════
+function saveState() {
+  try { localStorage.setItem('lafé_state', JSON.stringify(STATE)); } catch(e) {}
+}
+function loadState() {
+  try {
+    const saved = localStorage.getItem('lafé_state');
+    if (saved) {
+      const s = JSON.parse(saved);
+      Object.assign(STATE.semana, s.semana||{});
+      if (s.granos) STATE.granos = s.granos;
+      if (s.hacienda) Object.assign(STATE.hacienda, s.hacienda);
+      if (s.movimientos) STATE.movimientos = s.movimientos;
+      if (s.dieta) {
+        Object.assign(STATE.dieta.kgan, s.dieta.kgan||{});
+        if (s.dieta.ingredientes) STATE.dieta.ingredientes = s.dieta.ingredientes;
+      }
+      if (s.alimentos) STATE.alimentos = s.alimentos;
+      if (s.costos) Object.assign(STATE.costos, s.costos);
+    }
+  } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  event.target.classList.add('active');
+  renderPage(name);
+}
+function showTab(page, tab) {
+  document.querySelectorAll(`#page-${page} .tab-content`).forEach(t => t.classList.remove('active'));
+  document.querySelectorAll(`#page-${page} .tab-btn`).forEach(b => b.classList.remove('active'));
+  document.getElementById(`${page}-${tab}`).classList.add('active');
+  event.target.classList.add('active');
+  if (tab === 'empleados') renderEmpleados();
+  if (tab === 'consumo') renderConsumo();
+}
+function renderPage(name) {
+  if (name==='dashboard') renderDashboard();
+  if (name==='granos') renderGranos();
+  if (name==='hacienda') renderHacienda();
+  if (name==='racion') renderRacion();
+  if (name==='alimentos') renderAlimentos();
+  if (name==='costos') renderCostos();
+}
+
+// ═══════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════
+const fmt = n => isNaN(n) ? '—' : Number(n).toLocaleString('es-AR', {maximumFractionDigits:0});
+const fmt1 = n => isNaN(n) ? '—' : Number(n).toLocaleString('es-AR', {minimumFractionDigits:1, maximumFractionDigits:1});
+const pct = n => isNaN(n) ? '—' : Number(n).toFixed(1)+'%';
+const uid = () => Math.random().toString(36).slice(2,9);
+
+function getDiasRestantes(stock, consumoDiario) {
+  if (!consumoDiario || consumoDiario === 0) return null;
+  return stock / consumoDiario;
+}
+
+function badgeDias(dias) {
+  if (dias === null) return '<span class="badge badge-gray">—</span>';
+  if (dias < 7)  return `<span class="badge badge-red">CRÍTICO — ${fmt1(dias)} días</span>`;
+  if (dias < 14) return `<span class="badge badge-yellow">ALERTA — ${fmt1(dias)} días</span>`;
+  if (dias < 30) return `<span class="badge badge-blue">OK — ${fmt1(dias)} días</span>`;
+  return `<span class="badge badge-green">BIEN — ${fmt1(dias)} días</span>`;
+}
+
+// Totals from hacienda
+function getHaciendaTotals() {
+  const cats = {recria:0, engvq:0, engnov:0, adapt:0, total:0};
+  CORRALES.forEach(c => {
+    const corral = STATE.hacienda.corrales[c] || {};
+    const tot = Number(corral.total)||0;
+    cats.total += tot;
+    const cat = corral.cat||'';
+    if (cat==='Recría') cats.recria += tot;
+    else if (cat==='Engorde VQ') cats.engvq += tot;
+    else if (cat==='Engorde NOV') cats.engnov += tot;
+    else if (cat==='Adaptación') cats.adapt += tot;
+  });
+  return cats;
+}
+
+// Consumo diario por ingrediente
+function getConsumoIngrediente(ing) {
+  const tots = getHaciendaTotals();
+  const kgan = STATE.dieta.kgan;
+  let total = 0;
+  const cats = ['recria','engvq','engnov','adapt'];
+  const catNames = ['Recría','Engorde VQ','Engorde NOV','Adaptación'];
+  cats.forEach((c,i) => {
+    const animales = c==='recria'? tots.recria : c==='engvq'? tots.engvq : c==='engnov'? tots.engnov : tots.adapt;
+    const pctVal = ing.pct[c] || 0;
+    total += (pctVal/100) * kgan[c] * animales;
+  });
+  return total;
+}
+
+// ═══════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════
+function renderDashboard() {
+  // Fecha
+  document.getElementById('dash-fecha').value = STATE.semana.fecha;
+
+  // Hacienda stats
+  const tots = getHaciendaTotals();
+  document.getElementById('d-total-animales').textContent = fmt(tots.total);
+  document.getElementById('d-recria').textContent = fmt(tots.recria);
+  document.getElementById('d-engorde').textContent = fmt(tots.engvq + tots.engnov);
+  const activeCorrales = CORRALES.filter(c => (STATE.hacienda.corrales[c]||{}).total > 0).length;
+  document.getElementById('d-corrales').textContent = activeCorrales + ' / ' + CORRALES.length;
+
+  // Granos stats
+  const siloMaiz = STATE.granos.filter(g=>g.tipo==='Silo Maíz').reduce((s,g)=>s+Number(g.pesoActual||0),0);
+  const siloCeb  = STATE.granos.filter(g=>g.tipo==='Silo Cebada').reduce((s,g)=>s+Number(g.pesoActual||0),0);
+  const maizGrano= STATE.granos.filter(g=>g.tipo==='Maíz grano').reduce((s,g)=>s+Number(g.pesoActual||0),0);
+  const soja     = STATE.granos.filter(g=>g.tipo==='Soja').reduce((s,g)=>s+Number(g.pesoActual||0),0);
+  document.getElementById('d-silo-maiz').textContent = fmt(siloMaiz);
+  document.getElementById('d-silo-cebada').textContent = fmt(siloCeb);
+  document.getElementById('d-maiz').textContent = fmt(maizGrano);
+  document.getElementById('d-soja').textContent = fmt(soja);
+
+  // Días restantes
+  const diasHTML = STATE.dieta.ingredientes.map(ing => {
+    const consumoDiario = getConsumoIngrediente(ing);
+    let stock = 0;
+    // Try to get stock from granos or alimentos
+    const fromGranos = STATE.granos.filter(g=>g.tipo===ing.nombre || 
+      (ing.nombre==='Silo Cebada' && g.tipo==='Silo Cebada') ||
+      (ing.nombre==='Silo Maíz' && g.tipo==='Silo Maíz') ||
+      (ing.nombre==='Maíz grano' && g.tipo==='Maíz grano') ||
+      (ing.nombre==='Cebada' && g.tipo==='Cebada'));
+    if (fromGranos.length) stock = fromGranos.reduce((s,g)=>s+Number(g.pesoActual||0),0);
+    else {
+      const al = STATE.alimentos.find(a=>a.nombre===ing.nombre);
+      if (al) stock = Number(al.stock)||0;
+    }
+    const dias = consumoDiario > 0 ? stock / consumoDiario : null;
+    const pctBar = dias ? Math.min(100, (dias/60)*100) : 0;
+    const cls = dias===null?'':'': dias<7?'crit':dias<14?'warn':'ok';
+    return `<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+      <div style="width:160px;font-size:12px;">${ing.nombre}</div>
+      <div style="width:90px;text-align:right;font-size:11px;">${fmt(stock)} kg</div>
+      <div class="days-bar" style="flex:1;">
+        <div class="days-track"><div class="days-fill ${cls}" style="width:${pctBar}%"></div></div>
+        <div style="width:100px;">${badgeDias(dias)}</div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('dash-dias-restantes').innerHTML = diasHTML || '<p style="color:var(--text2)">Sin datos</p>';
+
+  // Alerts
+  let alerts = '';
+  STATE.dieta.ingredientes.forEach(ing => {
+    const consumoDiario = getConsumoIngrediente(ing);
+    if (!consumoDiario) return;
+    let stock = 0;
+    const fromGranos = STATE.granos.filter(g=>g.tipo===ing.nombre);
+    if (fromGranos.length) stock = fromGranos.reduce((s,g)=>s+Number(g.pesoActual||0),0);
+    else { const al = STATE.alimentos.find(a=>a.nombre===ing.nombre); if(al) stock=Number(al.stock)||0; }
+    const dias = stock / consumoDiario;
+    if (dias < 7) alerts += `<div class="alert alert-crit">⚠ ${ing.nombre}: solo ${fmt1(dias)} días de stock — CRÍTICO</div>`;
+    else if (dias < 14) alerts += `<div class="alert alert-warn">⚡ ${ing.nombre}: ${fmt1(dias)} días de stock — Reponer pronto</div>`;
+  });
+  document.getElementById('dash-alerts').innerHTML = alerts;
+}
+function saveSemana() {
+  STATE.semana.fecha = document.getElementById('dash-fecha').value;
+  saveState();
+}
+
+// ═══════════════════════════════════════════════
+// GRANOS Y SILO
+// ═══════════════════════════════════════════════
+function addGrano() {
+  const g = {
+    id: uid(),
+    tipo: document.getElementById('g-tipo').value,
+    cosecha: document.getElementById('g-cosecha').value,
+    bolsa: document.getElementById('g-bolsa').value,
+    ubicacion: document.getElementById('g-ubicacion').value,
+    kgInicial: Number(document.getElementById('g-kg-inicial').value)||0,
+    pesoActual: Number(document.getElementById('g-peso-actual').value)||0,
+    fecha: document.getElementById('g-fecha').value
+  };
+  if (!g.bolsa) { alert('Completá el nombre de la bolsa'); return; }
+  STATE.granos.push(g);
+  saveState();
+  renderGranos();
+}
+
+function deleteGrano(id) {
+  STATE.granos = STATE.granos.filter(g=>g.id!==id);
+  saveState(); renderGranos();
+}
+
+function renderGranos() {
+  const tipos = [...new Set(STATE.granos.map(g=>g.tipo))];
+  if (!tipos.length) {
+    document.getElementById('granos-tabla').innerHTML = `<div class="empty"><div class="empty-icon">🌾</div><p>No hay granos registrados. Usá el formulario de arriba para agregar.</p></div>`;
+    return;
+  }
+
+  // Set today date default
+  if (!document.getElementById('g-fecha').value)
+    document.getElementById('g-fecha').value = new Date().toISOString().split('T')[0];
+
+  const TIPO_COLORS = {'Silo Maíz':'var(--accent3)','Silo Cebada':'var(--accent)','Maíz grano':'var(--accent2)','Soja':'var(--gold)','Trigo':'#8B6914','Cebada':'var(--green)'};
+
+  let html = '';
+  const allTipos = ['Silo Maíz','Silo Cebada','Maíz grano','Soja','Trigo','Cebada','Pellet GS'];
+  allTipos.forEach(tipo => {
+    const rows = STATE.granos.filter(g=>g.tipo===tipo);
+    if (!rows.length) return;
+    const totalActual = rows.reduce((s,g)=>s+Number(g.pesoActual||0),0);
+    const color = TIPO_COLORS[tipo]||'var(--text2)';
+    html += `<div class="card">
+      <div class="card-title" style="color:${color}">${tipo} — <span style="font-family:'Fraunces',serif;font-size:16px;font-weight:600;">${fmt(totalActual)} kg total</span></div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Cosecha</th><th>Bolsa</th><th>Ubicación</th><th class="td-num">Kg cosecha inicial</th><th class="td-num">Peso actual (kg)</th><th>Fecha</th><th></th></tr></thead>
+        <tbody>`;
+    rows.forEach(g => {
+      html += `<tr>
+        <td>${g.cosecha}</td>
+        <td>${g.bolsa}</td>
+        <td>${g.ubicacion||'—'}</td>
+        <td class="td-num">${fmt(g.kgInicial)}</td>
+        <td class="td-num" style="font-weight:600">${fmt(g.pesoActual)}</td>
+        <td>${g.fecha||'—'}</td>
+        <td><button class="btn btn-secondary" style="padding:4px 8px;font-size:10px;" onclick="editGrano('${g.id}')">Editar</button>
+            <button class="btn btn-danger" style="padding:4px 8px;font-size:10px;margin-left:4px;" onclick="deleteGrano('${g.id}')">✕</button></td>
+      </tr>`;
+    });
+    html += `</tbody><tfoot><tr class="row-total"><td colspan="3">TOTAL ${tipo}</td><td class="td-num">${fmt(rows.reduce((s,g)=>s+Number(g.kgInicial||0),0))}</td><td class="td-num">${fmt(totalActual)}</td><td colspan="2"></td></tr></tfoot>
+      </table></div></div>`;
+  });
+  document.getElementById('granos-tabla').innerHTML = html;
+}
+
+function editGrano(id) {
+  const g = STATE.granos.find(x=>x.id===id);
+  if (!g) return;
+  document.getElementById('g-tipo').value = g.tipo;
+  document.getElementById('g-cosecha').value = g.cosecha;
+  document.getElementById('g-bolsa').value = g.bolsa;
+  document.getElementById('g-ubicacion').value = g.ubicacion;
+  document.getElementById('g-kg-inicial').value = g.kgInicial;
+  document.getElementById('g-peso-actual').value = g.pesoActual;
+  document.getElementById('g-fecha').value = g.fecha;
+  STATE.granos = STATE.granos.filter(x=>x.id!==id);
+  saveState();
+}
+
+// ═══════════════════════════════════════════════
+// HACIENDA
+// ═══════════════════════════════════════════════
+function renderHacienda() {
+  renderCorralesForm();
+  renderCorralesDisplay();
+  renderHaciendaTotales();
+  renderMovimientos();
+  renderVariacion();
+  const notas = document.getElementById('h-notas');
+  if (notas) notas.value = STATE.semana.notas||'';
+  const hf = document.getElementById('h-fecha');
+  if (hf && !hf.value) hf.value = STATE.hacienda.fecha || new Date().toISOString().split('T')[0];
+}
+
+function renderCorralesForm() {
+  const cont = document.getElementById('corrales-form');
+  if (!cont) return;
+  let html = '<div class="tbl-wrap"><table><thead><tr><th>Corral</th><th>Categoría</th><th class="td-num">Total</th>';
+  FIRMAS.forEach(f => html += `<th class="td-num">${f} M</th><th class="td-num">${f} H</th>`);
+  html += '<th class="td-num">Peso est. (kg)</th><th>Fecha salida est.</th></tr></thead><tbody>';
+
+  CORRALES.forEach(c => {
+    const d = STATE.hacienda.corrales[c] || {};
+    html += `<tr>
+      <td style="font-weight:600">Corral ${c}</td>
+      <td><select onchange="updateCorral(${JSON.stringify(c)},'cat',this.value)" style="width:130px;">
+        ${CATS.map(cat=>`<option ${d.cat===cat?'selected':''}>${cat}</option>`).join('')}
+      </select></td>
+      <td class="td-num" style="font-weight:600" id="corral-tot-${c}">${fmt(d.total||0)}</td>`;
+    ['five_m','five_h','mve_m','mve_h','tab_m','tab_h'].forEach(k => {
+      html += `<td><input type="number" value="${d[k]||0}" min="0" style="width:70px;text-align:right;" onchange="updateCorral(${JSON.stringify(c)},'${k}',this.value)"></td>`;
+    });
+    html += `<td><input type="number" value="${d.pesoEst||''}" placeholder="—" style="width:90px;text-align:right;" onchange="updateCorral(${JSON.stringify(c)},'pesoEst',this.value)"></td>
+      <td><input type="date" value="${d.fechaSalida||''}" style="width:130px;" onchange="updateCorral(${JSON.stringify(c)},'fechaSalida',this.value)"></td>
+    </tr>`;
+  });
+  html += '</tbody></table></div>';
+  cont.innerHTML = html;
+}
+
+function updateCorral(corral, field, value) {
+  if (!STATE.hacienda.corrales[corral]) STATE.hacienda.corrales[corral] = {};
+  STATE.hacienda.corrales[corral][field] = field.includes('m')||field.includes('h')||field.includes('Est') ? Number(value)||0 : value;
+  // Recalculate total
+  const d = STATE.hacienda.corrales[corral];
+  d.total = (Number(d.five_m)||0)+(Number(d.five_h)||0)+(Number(d.mve_m)||0)+(Number(d.mve_h)||0)+(Number(d.tab_m)||0)+(Number(d.tab_h)||0);
+  const el = document.getElementById(`corral-tot-${corral}`);
+  if (el) el.textContent = fmt(d.total);
+}
+
+function saveHacienda() {
+  STATE.hacienda.corralesPrev = JSON.parse(JSON.stringify(STATE.hacienda.corrales));
+  STATE.hacienda.fecha = document.getElementById('h-fecha')?.value || STATE.hacienda.fecha;
+  saveState();
+  renderCorralesDisplay();
+  renderHaciendaTotales();
+  renderVariacion();
+  renderDashboard();
+  alert('Semana guardada ✓');
+}
+
+function renderCorralesDisplay() {
+  const grid = document.getElementById('corrales-display');
+  if (!grid) return;
+  grid.innerHTML = CORRALES.map(c => {
+    const d = STATE.hacienda.corrales[c]||{};
+    const cat = d.cat||'';
+    const cls = CAT_CLASS[cat]||'';
+    const firmaChips = ['FIVE','MVE','TABELA'].map((f,i) => {
+      const keys = [['five_m','five_h'],['mve_m','mve_h'],['tab_m','tab_h']][i];
+      const tot = (Number(d[keys[0]])||0)+(Number(d[keys[1]])||0);
+      return tot > 0 ? `<span class="firma-chip">${f}: ${tot}</span>` : '';
+    }).join('');
+    return `<div class="corral-card ${cls}">
+      <div class="corral-num">Corral ${c}</div>
+      <div class="corral-total">${d.total||0}</div>
+      <div class="corral-cat">${cat||'Sin categoría'}</div>
+      ${firmaChips ? `<div class="corral-firmas">${firmaChips}</div>` : ''}
+      ${d.pesoEst ? `<div style="font-size:10px;color:var(--text2);margin-top:4px;">Peso est: ${fmt(d.pesoEst)} kg</div>` : ''}
+      ${d.fechaSalida ? `<div style="font-size:10px;color:var(--text2);">Salida: ${d.fechaSalida}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderHaciendaTotales() {
+  const el = document.getElementById('hacienda-totales');
+  if (!el) return;
+  const tots = getHaciendaTotals();
+  el.innerHTML = `<div class="grid-4">
+    <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value">${fmt(tots.total)}</div></div>
+    <div class="stat-card"><div class="stat-label">Recría</div><div class="stat-value">${fmt(tots.recria)}</div></div>
+    <div class="stat-card"><div class="stat-label">Engorde VQ</div><div class="stat-value">${fmt(tots.engvq)}</div></div>
+    <div class="stat-card"><div class="stat-label">Engorde NOV</div><div class="stat-value">${fmt(tots.engnov)}</div></div>
+  </div>`;
+}
+
+function addMovimiento() {
+  const m = {
+    id: uid(),
+    tipo: document.getElementById('mov-tipo').value,
+    cantidad: Number(document.getElementById('mov-cantidad').value)||0,
+    desc: document.getElementById('mov-desc').value,
+    fecha: document.getElementById('mov-fecha').value || new Date().toISOString().split('T')[0]
+  };
+  STATE.movimientos.unshift(m);
+  saveState();
+  renderMovimientos();
+  document.getElementById('mov-cantidad').value = '';
+  document.getElementById('mov-desc').value = '';
+}
+
+function renderMovimientos() {
+  const tbody = document.getElementById('mov-tabla');
+  if (!tbody) return;
+  if (!STATE.movimientos.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text2);padding:24px;">Sin movimientos registrados</td></tr>';
+    return;
+  }
+  tbody.innerHTML = STATE.movimientos.slice(0,50).map(m => `
+    <tr>
+      <td>${m.fecha||'—'}</td>
+      <td><span class="badge badge-blue">${m.tipo}</span></td>
+      <td class="td-num" style="font-weight:600">${fmt(m.cantidad)}</td>
+      <td>${m.desc||'—'}</td>
+      <td><button class="btn btn-danger" style="padding:3px 8px;font-size:10px;" onclick="deleteMovimiento('${m.id}')">✕</button></td>
+    </tr>`).join('');
+}
+
+function deleteMovimiento(id) {
+  STATE.movimientos = STATE.movimientos.filter(m=>m.id!==id);
+  saveState(); renderMovimientos();
+}
+
+function renderVariacion() {
+  const el = document.getElementById('hacienda-variacion');
+  if (!el) return;
+  const curr = getHaciendaTotals();
+  const prev = calcTotals(STATE.hacienda.corralesPrev||{});
+  const rows = [
+    ['Total animales', curr.total, prev.total],
+    ['Recría', curr.recria, prev.recria],
+    ['Engorde VQ', curr.engvq, prev.engvq],
+    ['Engorde NOV', curr.engnov, prev.engnov],
+    ['Adaptación', curr.adapt, prev.adapt],
+  ];
+  el.innerHTML = `<table><thead><tr><th>Categoría</th><th class="td-num">Esta semana</th><th class="td-num">Semana ant.</th><th class="td-num">Variación</th></tr></thead><tbody>
+    ${rows.map(([label,curr,prev])=>{
+      const diff = curr-prev;
+      const sign = diff>0?'+':'';
+      const cls = diff>0?'up':diff<0?'down':'';
+      return `<tr><td>${label}</td><td class="td-num">${fmt(curr)}</td><td class="td-num">${fmt(prev)}</td>
+        <td class="td-num stat-change ${cls}">${sign}${fmt(diff)}</td></tr>`;
+    }).join('')}
+  </tbody></table>`;
+}
+
+function calcTotals(corralesObj) {
+  const r = {recria:0,engvq:0,engnov:0,adapt:0,total:0};
+  CORRALES.forEach(c=>{
+    const d=corralesObj[c]||{};
+    const t=Number(d.total)||0;
+    r.total+=t;
+    if(d.cat==='Recría') r.recria+=t;
+    else if(d.cat==='Engorde VQ') r.engvq+=t;
+    else if(d.cat==='Engorde NOV') r.engnov+=t;
+    else if(d.cat==='Adaptación') r.adapt+=t;
+  });
+  return r;
+}
+
+function saveNotas() {
+  STATE.semana.notas = document.getElementById('h-notas').value;
+  saveState();
+}
+
+// ═══════════════════════════════════════════════
+// RACIÓN
+// ═══════════════════════════════════════════════
+function renderRacion() {
+  // Sync kg/an inputs
+  const kgan = STATE.dieta.kgan;
+  document.getElementById('d-kgan-recria').value = kgan.recria;
+  document.getElementById('d-kgan-engvq').value = kgan.engvq;
+  document.getElementById('d-kgan-engnov').value = kgan.engnov;
+  document.getElementById('d-kgan-adapt').value = kgan.adapt;
+  renderDietaTabla();
+}
+
+function recalcRacion() {
+  STATE.dieta.kgan = {
+    recria: Number(document.getElementById('d-kgan-recria').value)||0,
+    engvq: Number(document.getElementById('d-kgan-engvq').value)||0,
+    engnov: Number(document.getElementById('d-kgan-engnov').value)||0,
+    adapt: Number(document.getElementById('d-kgan-adapt').value)||0,
+  };
+  saveState();
+  renderDietaTabla();
+}
+
+function renderDietaTabla() {
+  const tbody = document.getElementById('dieta-tabla');
+  const tfoot = document.getElementById('dieta-totales');
+  if (!tbody) return;
+  const kgan = STATE.dieta.kgan;
+  const cats = ['recria','engvq','engnov','adapt'];
+
+  tbody.innerHTML = STATE.dieta.ingredientes.map((ing,idx) => {
+    const cells = cats.map(c => {
+      const pctVal = ing.pct[c]||0;
+      const kg = (pctVal/100)*kgan[c];
+      return `<td class="td-num"><input type="number" value="${pctVal}" min="0" max="100" step="0.1" style="width:65px;text-align:right;" onchange="updatePct(${idx},'${c}',this.value)"></td>
+              <td class="td-num" style="color:var(--text2)">${fmt1(kg)}</td>`;
+    }).join('');
+    return `<tr><td style="font-weight:500">${ing.nombre}</td>${cells}</tr>`;
+  }).join('');
+
+  // Totals row
+  const totals = cats.map(c => {
+    const totPct = STATE.dieta.ingredientes.reduce((s,i)=>s+(i.pct[c]||0),0);
+    const totKg = (totPct/100)*kgan[c];
+    const cls = Math.abs(totPct-100)<0.1 ? 'badge-green' : 'badge-red';
+    return `<td class="td-num"><span class="badge ${cls}">${pct(totPct)}</span></td><td class="td-num" style="font-weight:600">${fmt1(totKg)}</td>`;
+  }).join('');
+  tfoot.innerHTML = `<tr class="row-total"><td>TOTAL</td>${totals}</tr>`;
+}
+
+function updatePct(idx, cat, val) {
+  STATE.dieta.ingredientes[idx].pct[cat] = Number(val)||0;
+  saveState();
+  renderDietaTabla();
+}
+
+function renderEmpleados() {
+  const cont = document.getElementById('empleados-tabla');
+  if (!cont) return;
+  const tots = getHaciendaTotals();
+  const kgan = STATE.dieta.kgan;
+
+  let html = `<table><thead><tr><th>Corral</th><th>Categoría</th><th class="td-num">Animales</th>`;
+  STATE.dieta.ingredientes.forEach(i => { html += `<th class="td-num">${i.nombre}</th>`; });
+  html += `<th class="td-num">TOTAL kg/comida</th></tr></thead><tbody>`;
+
+  let grandTotal = {};
+  STATE.dieta.ingredientes.forEach(i => grandTotal[i.nombre] = 0);
+
+  CORRALES.forEach(c => {
+    const d = STATE.hacienda.corrales[c]||{};
+    const animales = Number(d.total)||0;
+    const cat = d.cat||'';
+    if (!cat) return;
+    const catKey = cat==='Recría'?'recria':cat==='Engorde VQ'?'engvq':cat==='Engorde NOV'?'engnov':'adapt';
+    let rowTotal = 0;
+    const cells = STATE.dieta.ingredientes.map(ing => {
+      const pctVal = ing.pct[catKey]||0;
+      const kg = (pctVal/100)*kgan[catKey]*animales/2;
+      rowTotal += kg;
+      grandTotal[ing.nombre] = (grandTotal[ing.nombre]||0)+kg;
+      return `<td class="td-num">${kg>0?fmt1(kg):'—'}</td>`;
+    }).join('');
+    html += `<tr><td style="font-weight:600">Corral ${c}</td><td><span class="badge ${cat==='Recría'?'badge-blue':cat==='Adaptación'?'badge-green':'badge-yellow'}">${cat}</span></td>
+      <td class="td-num">${animales}</td>${cells}<td class="td-num" style="font-weight:600">${fmt1(rowTotal)}</td></tr>`;
+  });
+
+  // Grand total row
+  const grandCells = STATE.dieta.ingredientes.map(i=>`<td class="td-num" style="font-weight:600">${fmt1(grandTotal[i.nombre])}</td>`).join('');
+  const grandSum = Object.values(grandTotal).reduce((a,b)=>a+b,0);
+  html += `<tr class="row-total"><td colspan="3">TOTAL / comida</td>${grandCells}<td class="td-num" style="font-weight:600">${fmt1(grandSum)}</td></tr>`;
+  html += '</tbody></table>';
+  cont.innerHTML = html;
+}
+
+function renderConsumo() {
+  const tbody = document.getElementById('consumo-tabla');
+  if (!tbody) return;
+  let totalDia = 0;
+  tbody.innerHTML = STATE.dieta.ingredientes.map(ing => {
+    const diario = getConsumoIngrediente(ing);
+    totalDia += diario;
+    return `<tr>
+      <td style="font-weight:500">${ing.nombre}</td>
+      <td class="td-num">${fmt1(diario)}</td>
+      <td class="td-num">${fmt1(diario*7)}</td>
+      <td class="td-num">${fmt1(diario/2)}</td>
+    </tr>`;
+  }).join('');
+  tbody.innerHTML += `<tr class="row-total"><td>TOTAL</td><td class="td-num">${fmt1(totalDia)}</td><td class="td-num">${fmt1(totalDia*7)}</td><td class="td-num">${fmt1(totalDia/2)}</td></tr>`;
+}
+
+// ═══════════════════════════════════════════════
+// ALIMENTOS
+// ═══════════════════════════════════════════════
+function saveAlimento() {
+  const nombre = document.getElementById('al-nombre').value;
+  const stock = Number(document.getElementById('al-stock').value)||0;
+  const ingreso = Number(document.getElementById('al-ingreso').value)||0;
+  const fecha = document.getElementById('al-fecha').value || new Date().toISOString().split('T')[0];
+
+  // Update or add
+  const existing = STATE.alimentos.find(a=>a.nombre===nombre);
+  if (existing) {
+    existing.stock = stock;
+    existing.fecha = fecha;
+  } else {
+    STATE.alimentos.push({id:uid(), nombre, stock, fecha});
+  }
+  // Log ingreso if > 0
+  if (ingreso > 0) {
+    STATE.movimientos.unshift({id:uid(), tipo:'Ingreso alimento', cantidad:ingreso, desc:`${nombre} — ingreso de ${fmt(ingreso)} kg`, fecha});
+  }
+  saveState();
+  renderAlimentos();
+  document.getElementById('al-stock').value = '';
+  document.getElementById('al-ingreso').value = '';
+}
+
+function renderAlimentos() {
+  const tbody = document.getElementById('alimentos-tabla');
+  if (!tbody) return;
+
+  const ingredientes = STATE.dieta.ingredientes;
+  // Get all ingredient names
+  const allNames = [...new Set([...ingredientes.map(i=>i.nombre), ...STATE.alimentos.map(a=>a.nombre)])];
+
+  tbody.innerHTML = allNames.map(nombre => {
+    const al = STATE.alimentos.find(a=>a.nombre===nombre);
+    const stock = al ? Number(al.stock)||0 : null;
+    const ing = ingredientes.find(i=>i.nombre===nombre);
+    const consumoDiario = ing ? getConsumoIngrediente(ing) : 0;
+
+    // For granos, get stock from granos array
+    let stockDisplay = stock;
+    const tiposGranos = ['Silo Maíz','Silo Cebada','Maíz grano','Soja','Trigo','Cebada'];
+    if (tiposGranos.includes(nombre)) {
+      stockDisplay = STATE.granos.filter(g=>g.tipo===nombre).reduce((s,g)=>s+Number(g.pesoActual||0),0);
+    }
+
+    const dias = (stockDisplay!==null && consumoDiario>0) ? stockDisplay/consumoDiario : null;
+
+    return `<tr>
+      <td style="font-weight:500">${nombre}</td>
+      <td class="td-num">${stockDisplay!==null ? fmt(stockDisplay) : '<span style="color:var(--text2)">—</span>'}</td>
+      <td class="td-num">${consumoDiario>0?fmt1(consumoDiario):'—'}</td>
+      <td class="td-num">${consumoDiario>0?fmt1(consumoDiario*7):'—'}</td>
+      <td class="td-num" style="font-weight:600">${dias!==null?fmt1(dias):'—'}</td>
+      <td class="td-center">${badgeDias(dias)}</td>
+    </tr>`;
+  }).join('');
+
+  // Historial
+  const hist = document.getElementById('alimentos-historial');
+  if (hist) {
+    const ingresos = STATE.movimientos.filter(m=>m.tipo==='Ingreso alimento').slice(0,20);
+    hist.innerHTML = ingresos.length ? ingresos.map(m=>`<tr><td>${m.fecha}</td><td>${m.desc?.split('—')[0]?.trim()||'—'}</td><td class="td-num">${fmt(m.cantidad)}</td><td>${m.desc||''}</td></tr>`).join('') :
+      '<tr><td colspan="4" style="text-align:center;color:var(--text2);padding:16px;">Sin ingresos registrados</td></tr>';
+  }
+
+  document.getElementById('al-fecha').value = new Date().toISOString().split('T')[0];
+}
+
+// ═══════════════════════════════════════════════
+// COSTO RACIÓN
+// ═══════════════════════════════════════════════
+function renderCostos() {
+  // Build price inputs
+  const cont = document.getElementById('costos-ingredientes-form');
+  if (!cont) return;
+  cont.innerHTML = STATE.dieta.ingredientes.map(ing => {
+    const precio = STATE.costos.precios[ing.nombre]||0;
+    return `<div class="form-group">
+      <label>${ing.nombre}</label>
+      <input type="number" value="${precio}" step="0.01" style="width:110px;" 
+             onchange="updatePrecio('${ing.nombre}',this.value)" placeholder="$/kg">
+    </div>`;
+  }).join('');
+  recalcCostos();
+}
+
+function updatePrecio(nombre, val) {
+  STATE.costos.precios[nombre] = Number(val)||0;
+  saveState();
+  recalcCostos();
+}
+
+function recalcCostos() {
+  STATE.costos.dolar = Number(document.getElementById('c-dolar')?.value)||0;
+  STATE.costos.ptro  = Number(document.getElementById('c-ptro')?.value)||0;
+  STATE.costos.ptra  = Number(document.getElementById('c-ptra')?.value)||0;
+  STATE.costos.pvnov = Number(document.getElementById('c-pvnov')?.value)||0;
+  STATE.costos.pvvaq = Number(document.getElementById('c-pvvaq')?.value)||0;
+  saveState();
+
+  const kgan = STATE.dieta.kgan;
+  // Días de recría y engorde (hardcoded for now, could be editable)
+  const diasRec = 90, diasEng = 100;
+  const pesoVentaNov = 390, pesoVentaVaq = 340;
+  const pesoEntradaTro = 200, pesoEntradaTra = 180;
+
+  function calcCategoria(catKey, pesoVenta, pesoEntrada, ptro, pv, label) {
+    let costoRacionRec = 0, costoRacionEng = 0;
+    STATE.dieta.ingredientes.forEach(ing => {
+      const precio = STATE.costos.precios[ing.nombre]||0;
+      const kgRec = ((ing.pct[catKey]||0)/100)*kgan[catKey];
+      // Use recria for recria cost, engvq/engnov for engorde
+      const engKey = catKey==='engvq'?'engvq':'engnov';
+      const kgEng = ((ing.pct[engKey]||0)/100)*kgan[engKey];
+      costoRacionRec += precio * kgRec * diasRec;
+      costoRacionEng += precio * kgEng * diasEng;
+    });
+    const costoInicial = ptro * 1.1 * pesoEntrada;
+    const precioVentaTotal = pv * pesoVenta;
+    const costoTotal = costoInicial + costoRacionRec + costoRacionEng;
+    const margen = precioVentaTotal - costoTotal;
+    const rentab = precioVentaTotal > 0 ? (margen/precioVentaTotal*100) : 0;
+
+    return `<table style="width:100%;"><tbody>
+      <tr><td>Precio venta (${pesoVenta} kg)</td><td class="td-num" style="font-weight:600">${fmt(precioVentaTotal)}</td></tr>
+      <tr><td>Costo inicial ternero/a</td><td class="td-num">${fmt(costoInicial)}</td></tr>
+      <tr><td>Costo ración recría (${diasRec} días)</td><td class="td-num">${fmt(costoRacionRec)}</td></tr>
+      <tr><td>Costo ración engorde (${diasEng} días)</td><td class="td-num">${fmt(costoRacionEng)}</td></tr>
+      <tr style="border-top:2px solid var(--border)"><td style="font-weight:600">Costo total</td><td class="td-num" style="font-weight:600">${fmt(costoTotal)}</td></tr>
+      <tr><td style="font-weight:600">Margen bruto</td>
+          <td class="td-num"><span style="font-family:'Fraunces',serif;font-size:20px;font-weight:600;color:${margen>=0?'var(--green)':'var(--red)'}">$${fmt(margen)}</span></td></tr>
+      <tr><td>Rentabilidad</td>
+          <td class="td-num"><span style="font-size:16px;font-weight:600;color:${rentab>=0?'var(--green)':'var(--red)'}">${fmt1(rentab)}%</span></td></tr>
+    </tbody></table>`;
+  }
+
+  const novEl = document.getElementById('costos-novillo');
+  const vaqEl = document.getElementById('costos-vaquillona');
+  if (novEl) novEl.innerHTML = calcCategoria('engnov', pesoVentaNov, pesoEntradaTro, STATE.costos.ptro, STATE.costos.pvnov, 'Novillo');
+  if (vaqEl) vaqEl.innerHTML = calcCategoria('engvq', pesoVentaVaq, pesoEntradaTra, STATE.costos.ptra, STATE.costos.pvvaq, 'Vaquillona');
+}
+
+// ═══════════════════════════════════════════════
+// EXPORT TO EXCEL
+// ═══════════════════════════════════════════════
+function exportExcel() {
+  const wb = XLSX.utils.book_new();
+
+  // Granos
+  if (STATE.granos.length) {
+    const data = [['Tipo','Cosecha','Bolsa','Ubicación','Kg Cosecha Inicial','Peso Actual (kg)','Fecha']];
+    STATE.granos.forEach(g => data.push([g.tipo,g.cosecha,g.bolsa,g.ubicacion,g.kgInicial,g.pesoActual,g.fecha]));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), 'Granos y Silo');
+  }
+
+  // Hacienda
+  const hacData = [['Corral','Categoría','Total','FIVE M','FIVE H','MVE M','MVE H','TAB M','TAB H','Peso Est','Fecha Salida']];
+  CORRALES.forEach(c => {
+    const d = STATE.hacienda.corrales[c]||{};
+    hacData.push([`Corral ${c}`,d.cat||'',d.total||0,d.five_m||0,d.five_h||0,d.mve_m||0,d.mve_h||0,d.tab_m||0,d.tab_h||0,d.pesoEst||'',d.fechaSalida||'']);
+  });
+  const tots = getHaciendaTotals();
+  hacData.push(['TOTAL','',tots.total,'','','','','','','','']);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(hacData), 'Hacienda');
+
+  // Movimientos
+  if (STATE.movimientos.length) {
+    const movData = [['Fecha','Tipo','Cantidad','Descripción']];
+    STATE.movimientos.forEach(m => movData.push([m.fecha,m.tipo,m.cantidad,m.desc]));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(movData), 'Movimientos');
+  }
+
+  // Ración — dieta
+  const kgan = STATE.dieta.kgan;
+  const dietaData = [['Ingrediente','% Recría','kg/an Recría','% Eng VQ','kg/an Eng VQ','% Eng NOV','kg/an Eng NOV','% Adapt','kg/an Adapt']];
+  STATE.dieta.ingredientes.forEach(ing => {
+    dietaData.push([ing.nombre,
+      ing.pct.recria, (ing.pct.recria/100)*kgan.recria,
+      ing.pct.engvq,  (ing.pct.engvq/100)*kgan.engvq,
+      ing.pct.engnov, (ing.pct.engnov/100)*kgan.engnov,
+      ing.pct.adapt,  (ing.pct.adapt/100)*kgan.adapt,
+    ]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dietaData), 'Ración Dieta');
+
+  // Ración — empleados
+  const empData = [['Corral','Categoría','Animales',...STATE.dieta.ingredientes.map(i=>i.nombre),'TOTAL kg/comida']];
+  CORRALES.forEach(c => {
+    const d = STATE.hacienda.corrales[c]||{};
+    if (!d.cat||!d.total) return;
+    const catKey = d.cat==='Recría'?'recria':d.cat==='Engorde VQ'?'engvq':d.cat==='Engorde NOV'?'engnov':'adapt';
+    let total = 0;
+    const kgs = STATE.dieta.ingredientes.map(ing=>{
+      const kg=(ing.pct[catKey]||0)/100*kgan[catKey]*d.total/2;
+      total+=kg; return kg;
+    });
+    empData.push([`Corral ${c}`,d.cat,d.total,...kgs,total]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(empData), 'Planilla Empleados');
+
+  // Alimentos + días restantes
+  const alData = [['Alimento','Stock (kg)','Consumo Diario (kg)','Consumo Semanal (kg)','Días Restantes','Estado']];
+  STATE.dieta.ingredientes.forEach(ing => {
+    let stock = 0;
+    const tiposGranos=['Silo Maíz','Silo Cebada','Maíz grano','Soja','Trigo','Cebada'];
+    if(tiposGranos.includes(ing.nombre)) stock=STATE.granos.filter(g=>g.tipo===ing.nombre).reduce((s,g)=>s+Number(g.pesoActual||0),0);
+    else { const al=STATE.alimentos.find(a=>a.nombre===ing.nombre); if(al) stock=Number(al.stock)||0; }
+    const consumoDiario = getConsumoIngrediente(ing);
+    const dias = consumoDiario>0 ? stock/consumoDiario : null;
+    const estado = dias===null?'—':dias<7?'CRÍTICO':dias<14?'ALERTA':dias<30?'OK':'BIEN';
+    alData.push([ing.nombre,stock,consumoDiario,consumoDiario*7,dias?Math.round(dias*10)/10:'—',estado]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(alData), 'Alimentos');
+
+  // Costo ración summary
+  const costoData = [['Parámetro','Novillo','Vaquillona'],
+    ['Precio ternero/a ($/kg)',STATE.costos.ptro,STATE.costos.ptra],
+    ['Precio venta ($/kg)',STATE.costos.pvnov,STATE.costos.pvvaq],
+    ['Dólar',STATE.costos.dolar,''],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(costoData), 'Costo Ración');
+
+  const fecha = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb, `LaFe_${fecha}.xlsx`);
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+loadState();
+renderDashboard();
+// Init corrales if empty
+CORRALES.forEach(c => { if (!STATE.hacienda.corrales[c]) STATE.hacienda.corrales[c] = {cat:'',total:0,five_m:0,five_h:0,mve_m:0,mve_h:0,tab_m:0,tab_h:0}; });
+
+// Set default dates
+document.getElementById('dash-fecha').value = STATE.semana.fecha;
+document.getElementById('al-fecha').value = new Date().toISOString().split('T')[0];
+document.getElementById('mov-fecha').value = new Date().toISOString().split('T')[0];
+document.getElementById('g-fecha').value = new Date().toISOString().split('T')[0];
+</script>
+</body>
+</html>
