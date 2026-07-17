@@ -76,8 +76,18 @@ input[type=number]{text-align:right}
 @media(max-width:700px){.g2,.g3,.g4{grid-template-columns:1fr}.nb{padding:10px 7px;font-size:11px}}
 @media print{nav,.no-print{display:none!important}body{background:#fff}}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
+<div id="login-gate" style="display:none;position:fixed;inset:0;background:#1a1714;z-index:9999;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif">
+  <div style="background:#f5f4f0;border-radius:8px;padding:32px 28px;width:280px;max-width:90vw;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.4)">
+    <div style="font-size:20px;font-weight:700;color:#1a1714;margin-bottom:4px">La <span style="color:#c8961e">Fé</span></div>
+    <div style="font-size:12px;color:#6b6355;margin-bottom:18px">Acceso de lectura</div>
+    <input type="password" id="lg-pass" placeholder="Contraseña" style="width:100%;padding:9px 10px;border-radius:4px;border:1px solid #ccc;font-size:14px;margin-bottom:10px;box-sizing:border-box" onkeydown="if(event.key==='Enter')intentarLogin()">
+    <button onclick="intentarLogin()" style="width:100%;padding:9px;border-radius:4px;border:none;background:#2d5016;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Entrar</button>
+    <div id="lg-error" style="color:#8b1a1a;font-size:12px;margin-top:10px;display:none">Contraseña incorrecta</div>
+  </div>
+</div>
 <nav>
   <div class="brand">La <span>Fé</span></div>
   <button class="nb active" onclick="goPage(this,'dash')">Dashboard</button>
@@ -92,6 +102,9 @@ input[type=number]{text-align:right}
   <button class="ebtn no-print" onclick="guardarSemana()">💾 Guardar semana</button>
   <button class="ebtn no-print" onclick="exportarExcel()" style="background:#1a3a5c">📥 Exportar Excel</button>
   <button class="ebtn" id="btn-refresh" onclick="refreshData()" style="background:#595959;display:none">🔄 Actualizar</button>
+  <button class="ebtn" id="btn-importar" onclick="importarDesdeExcel()" style="background:#7b3f00">📥 Importar Excel</button>
+  <button class="ebtn no-print" id="btn-publicar" onclick="publicarNetlify()" style="background:#2d6a4f;display:none">🚀 Publicar</button>
+  <button class="ebtn no-print" id="btn-exportjson" onclick="exportarEstadoJSON()" style="background:#5a3e8f;display:none">💾 Exportar JSON</button>
 </nav>
 <main>
 
@@ -115,6 +128,8 @@ input[type=number]{text-align:right}
     <div class="metric"><div class="lbl">Silo cebada</div><div class="val" id="d-sc">—</div></div>
     <div class="metric"><div class="lbl">Maíz grano</div><div class="val" id="d-mg">—</div></div>
     <div class="metric"><div class="lbl">Soja</div><div class="val" id="d-sj">—</div></div>
+    <div class="metric"><div class="lbl">Trigo</div><div class="val" id="d-tr">—</div></div>
+    <div class="metric"><div class="lbl">Cebada</div><div class="val" id="d-ceb">—</div></div>
   </div>
   <div class="card"><div class="cttl">Días restantes por alimento</div><div id="dash-dias"><p class="empty">Completá la dieta y hacienda para ver este resumen.</p></div></div>
 </div>
@@ -137,7 +152,8 @@ input[type=number]{text-align:right}
       <div class="fg"><label>Ubicación</label><input id="g-ubic" style="width:100px" placeholder="Lote 8"></div>
       <div class="fg"><label>Kg cosecha inicial</label><input type="number" id="g-kgini" style="width:120px" placeholder="0"></div>
       <div class="fg"><label>Metros iniciales (m)</label><input type="number" id="g-mini" style="width:100px" placeholder="90"></div>
-      <div class="fg"><label>Metros actuales (m)</label><input type="number" id="g-mact" style="width:100px" placeholder="0"></div>
+      <div class="fg"><label>Metros actuales (m)</label><input type="number" id="g-mact" style="width:100px" placeholder="0" onchange="updKgFromMetros()"></div>
+      <div class="fg"><label>Kg actuales (o ingresá directo)</label><input type="number" id="g-kgact-directo" style="width:130px;border:1.5px solid #c8961e" placeholder="editá los kg acá" onchange="updMetrosFromKg()"></div>
       <div class="fg"><label>Fecha</label><input type="date" id="g-fec"></div>
       <button class="btn btn-p" id="g-save-btn" onclick="addGrano()">Guardar</button>
     </div>
@@ -179,27 +195,29 @@ input[type=number]{text-align:right}
       <div class="form-row">
         <div class="fg"><label>Fecha semana</label><input type="date" id="h-fec"></div>
         <button class="btn btn-p" onclick="saveHac()">Guardar corrales</button>
-        <button class="btn" onclick="syncHacFromTropas();save();renderHacienda();" title="Recalcular desde tropas">🔄 Sincronizar desde tropas</button>
       </div>
       <div id="corr-form"></div>
     </div>
-    <div class="cg" id="corr-disp"></div>
     <div class="card"><div class="cttl">Totales por categoría</div><div id="h-tots"></div></div>
   </div>
   <div id="ht-movimientos" class="tc">
     <div class="card no-print">
-      <div class="cttl">Registrar movimiento</div>
+      <div class="cttl">Registrar muerte</div>
       <div class="form-row">
-        <div class="fg"><label>Tipo</label>
-          <select id="mv-tipo"><option>Ingreso TROS</option><option>Ingreso TRAS</option><option>Venta Novillos</option><option>Venta Vaquillonas</option><option>Muerte Recría</option><option>Muerte Engorde</option><option>Nacimiento</option><option>Otro</option></select></div>
+        <div class="fg"><label>Corral</label>
+          <select id="mv-corral"><option value="">— elegir —</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option><option>Manga</option></select></div>
+        <div class="fg"><label>Firma (dueño)</label>
+          <select id="mv-firma"><option>FIVE</option><option>MVE</option><option>TABELA</option></select></div>
+        <div class="fg"><label>Sexo</label>
+          <select id="mv-sexo"><option>Machos</option><option>Hembras</option></select></div>
         <div class="fg"><label>Cantidad</label><input type="number" id="mv-cant" style="width:90px"></div>
-        <div class="fg"><label>Descripción</label><input id="mv-desc" style="width:260px" placeholder="Detalle del movimiento"></div>
+        <div class="fg"><label>Descripción</label><input id="mv-desc" style="width:220px" placeholder="Detalle (opcional)"></div>
         <div class="fg"><label>Fecha</label><input type="date" id="mv-fec"></div>
-        <button class="btn btn-p" onclick="addMov()" id="mv-save-btn">Registrar</button>
+        <button class="btn btn-p" onclick="addMov()" id="mv-save-btn">Registrar muerte</button>
       </div>
     </div>
-    <div class="card"><div class="cttl">Historial de movimientos</div>
-      <div class="tw"><table><thead><tr><th>Fecha</th><th>Tipo</th><th class="r">Cantidad</th><th>Descripción</th><th></th></tr></thead>
+    <div class="card"><div class="cttl">Historial de muertes</div>
+      <div class="tw"><table><thead><tr><th>Fecha</th><th>Corral</th><th>Firma</th><th>Sexo</th><th class="r">Cantidad</th><th>Descripción</th><th></th></tr></thead>
       <tbody id="mov-tbl"></tbody></table></div></div>
   </div>
   <div id="ht-resumen" class="tc">
@@ -242,7 +260,7 @@ input[type=number]{text-align:right}
   </div>
   <div id="rt-cons" class="tc">
     <div class="card"><table>
-      <thead><tr><th>Ingrediente</th><th class="r">kg/día</th><th class="r">kg/semana</th><th class="r">kg/comida (÷2)</th></tr></thead>
+      <thead><tr><th>Ingrediente</th><th class="r">kg/día</th><th class="r">kg/semana</th></tr></thead>
       <tbody id="cons-body"></tbody>
     </table></div>
   </div>
@@ -255,7 +273,7 @@ input[type=number]{text-align:right}
     <div class="cttl">Actualizar stock</div>
     <div class="form-row">
       <div class="fg"><label>Alimento</label>
-        <select id="al-nom"><option>Pellet GS</option><option>Núcleo Terneros</option><option>Núcleo FSU</option><option>Urea</option><option>Expeller Soja</option></select></div>
+        <select id="al-nom"><option>Pellet de Gs</option><option>Núcleo Terneros</option><option>Núcleo FSU</option><option>Urea</option><option>Expeller Soja</option></select></div>
       <div class="fg"><label>Stock actual (kg)</label><input type="number" id="al-stk" style="width:130px"></div>
       <div class="fg"><label>Ingreso esta semana (kg)</label><input type="number" id="al-ing" placeholder="0" style="width:130px"></div>
       <div class="fg"><label>Fecha</label><input type="date" id="al-fec"></div>
@@ -280,6 +298,13 @@ input[type=number]{text-align:right}
       <div class="fg"><label>P° ternera ($/kg)</label><input type="number" id="c-tra" style="width:110px" onchange="recalcC()"></div>
       <div class="fg"><label>Venta novillo ($/kg)</label><input type="number" id="c-pvn" style="width:110px" onchange="recalcC()"></div>
       <div class="fg"><label>Venta vaquillona ($/kg)</label><input type="number" id="c-pvv" style="width:110px" onchange="recalcC()"></div>
+    </div>
+    <div class="form-row" style="margin-top:10px;padding-top:10px;border-top:1px solid #eee">
+      <div class="fg"><label>Recría novillo (días)</label><input type="number" id="c-dr-n" value="90" style="width:80px" oninput="recalcC()"></div>
+      <div class="fg"><label>Recría vaquillona (días)</label><input type="number" id="c-dr-v" value="90" style="width:80px" oninput="recalcC()"></div>
+      <div class="fg"><label>Días adaptación</label><input type="number" id="c-da" value="14" style="width:80px" oninput="recalcC()"></div>
+      <div class="fg"><label>Engorde novillo (días)</label><input type="number" id="c-de-n" value="100" style="width:80px" oninput="recalcC()"></div>
+      <div class="fg"><label>Engorde vaquillona (días)</label><input type="number" id="c-de-v" value="100" style="width:80px" oninput="recalcC()"></div>
     </div>
   </div>
   <div class="card"><div class="cttl">Precio ingredientes ($/kg)</div><div id="c-prec" class="form-row" style="flex-wrap:wrap"></div></div>
@@ -309,8 +334,7 @@ input[type=number]{text-align:right}
   <div class="tabs">
     <button class="tab active" onclick="goTab(this,'tr-nueva')">Nueva tropa</button>
     <button class="tab" onclick="goTab(this,'tr-resumen')">Resumen tropas</button>
-    <button class="tab" onclick="goTab(this,'tr-muertes')">Muertes</button>
-    <button class="tab" onclick="goTab(this,'tr-ventas')">Ventas</button>
+    <button class="tab" onclick="goTab(this,'tr-lotes')">Lotes de venta</button>
   </div>
 
   <div id="tr-nueva" class="tc active">
@@ -404,19 +428,37 @@ input[type=number]{text-align:right}
     </div>
   </div>
 
-  <div id="tr-muertes" class="tc">
+  <div id="tr-resumen" class="tc">
+    <!-- Tabla de tropas -->
     <div class="card">
+      <div class="cttl">Resumen de tropas</div>
+      <div class="tw" style="margin-top:10px;overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>Firma</th><th>Origen</th><th>Corral</th><th>Sexo</th>
+            <th>F. Ingreso</th><th class="r">Cant.</th><th class="r">Peso ini.</th>
+            <th>F. Adp/Eng</th><th class="r">PV1 (kg)</th>
+            <th style="color:#1a3a5c">📅 1ra salida</th><th class="r">Días</th>
+            <th class="r">PV2 (kg)</th>
+            <th style="color:#843c0c">📅 2da salida</th><th class="r">Días</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="tr-tabla"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Muertes -->
+    <div class="card" style="margin-top:14px">
       <div class="cttl">Registrar muerte</div>
       <div class="form-row">
-        <div class="fg"><label>Fecha</label><input type="date" id="mu-fecha"></div>
         <div class="fg"><label>Tropa</label>
-          <select id="mu-tropa" onchange="autocompletarMuerte()">
-            <option value="">— elegir tropa —</option>
-          </select>
+          <select id="mu-tropa" onchange="autocompletarMuerte()" style="width:200px"><option value="">— elegir tropa —</option></select>
         </div>
+        <div class="fg"><label>Fecha</label><input type="date" id="mu-fecha"></div>
         <div class="fg"><label>Corral</label>
-          <select id="mu-corral">
-            <option value="">— elegir —</option>
+          <select id="mu-corral" style="width:80px">
+            <option value="">—</option>
             <option>1</option><option>2</option><option>3</option><option>4</option>
             <option>5</option><option>6</option><option>7</option><option>8</option>
             <option>9</option><option>10</option><option>11</option><option>12</option>
@@ -424,7 +466,7 @@ input[type=number]{text-align:right}
           </select>
         </div>
         <div class="fg"><label>Firma</label>
-          <select id="mu-firma"><option>FIVE</option><option>MVE</option><option>TABELA</option></select>
+          <select id="mu-firma" style="width:100px"><option>FIVE</option><option>MVE</option><option>TABELA</option></select>
         </div>
         <div class="fg"><label>Sexo</label>
           <select id="mu-sexo"><option>Machos</option><option>Hembras</option></select>
@@ -433,83 +475,102 @@ input[type=number]{text-align:right}
           <select id="mu-cat"><option>Recría</option><option>Engorde NOV</option><option>Engorde VQ</option><option>Adaptación</option></select>
         </div>
         <div class="fg"><label>Cantidad</label>
-          <input type="number" id="mu-cant" value="1" min="1" style="width:80px">
+          <input type="number" id="mu-cant" value="1" min="1" style="width:70px">
         </div>
-        <div class="fg"><label>Observación</label>
-          <input type="text" id="mu-obs" style="width:180px" placeholder="Opcional">
+        <div class="fg"><label>Observaciones</label><input id="mu-obs" style="width:180px"></div>
+        <div class="fg" style="align-self:flex-end">
+          <button class="btn btn-p" onclick="registrarMuerte()">Registrar muerte</button>
         </div>
-        <button class="btn btn-p" onclick="registrarMuerte()">Registrar</button>
+      </div>
+      <div class="tw" style="margin-top:10px">
+        <table>
+          <thead><tr><th>Fecha</th><th>Tropa/Origen</th><th>Corral</th><th>Firma</th><th>Sexo</th><th>Cat.</th><th class="r">Cant.</th><th>Obs.</th><th></th></tr></thead>
+          <tbody id="mu-tabla"></tbody>
+        </table>
       </div>
     </div>
-    <div class="card">
-      <div class="cttl">Historial de muertes</div>
-      <div class="tw"><table>
-        <thead><tr><th>Fecha</th><th>Tropa</th><th>Corral</th><th>Firma</th><th>Sexo</th><th>Categoría</th><th class="r">Cantidad</th><th>Obs.</th><th></th></tr></thead>
-        <tbody id="mu-tabla"></tbody>
-      </table></div>
+
+    <!-- Ventas -->
+    <div class="card" style="margin-top:14px">
+      <div class="cttl">Registrar venta</div>
+      <div class="form-row">
+        <div class="fg"><label>Fecha</label><input type="date" id="vt-fecha"></div>
+        <div class="fg"><label>Firma</label>
+          <select id="vt-firma"><option>FIVE</option><option>MVE</option><option>TABELA</option></select>
+        </div>
+        <div class="fg"><label>Sexo</label>
+          <select id="vt-sexo"><option>Machos</option><option>Hembras</option></select>
+        </div>
+        <div class="fg"><label>Cantidad</label>
+          <input type="number" id="vt-cant" value="1" min="1" style="width:70px" oninput="calcVentaTotal()">
+        </div>
+        <div class="fg"><label>Peso prom. (kg)</label>
+          <input type="number" id="vt-peso" style="width:100px" placeholder="380" oninput="calcVentaTotal()">
+        </div>
+        <div class="fg"><label>Tropa</label>
+          <select id="vt-tropa" onchange="autocompletarVenta()" style="width:200px"><option value="">— elegir tropa —</option></select>
+        </div>
+        <div class="fg"><label>Corral</label>
+          <select id="vt-corral" style="width:80px">
+            <option value="">—</option>
+            <option>1</option><option>2</option><option>3</option><option>4</option>
+            <option>5</option><option>6</option><option>7</option><option>8</option>
+            <option>9</option><option>10</option><option>11</option><option>12</option>
+            <option>Manga</option>
+          </select>
+        </div>
+        <div class="fg"><label>Precio ($/kg)</label>
+          <input type="number" id="vt-precio" style="width:100px" oninput="calcVentaTotal()">
+        </div>
+        <div class="fg"><label>N° DTE</label><input id="vt-dte" style="width:110px"></div>
+        <div class="fg"><label>Destino</label><input id="vt-destino" style="width:140px"></div>
+        <div class="fg" style="align-self:flex-end">
+          <button class="btn btn-p" onclick="registrarVenta()">Registrar venta</button>
+        </div>
+      </div>
+      <div id="vt-total-calc" style="display:none;background:#e8f5e9;padding:8px 14px;border-radius:6px;font-weight:600;color:#2d5016;margin-top:8px"></div>
+      <div class="tw" style="margin-top:10px">
+        <table>
+          <thead><tr><th>Fecha</th><th>Tropa</th><th>Corral</th><th>Firma</th><th>Sexo</th><th class="r">Cant.</th><th class="r">Peso</th><th class="r">Precio/kg</th><th class="r">Total</th><th>DTE</th><th>Destino</th><th></th></tr></thead>
+          <tbody id="vt-tabla"></tbody>
+        </table>
+      </div>
+      <div id="vt-grand-total" style="text-align:right;font-weight:700;font-size:15px;margin-top:8px;color:#2d5016"></div>
     </div>
   </div>
+
+  <div id="tr-lotes" class="tc">
     <div class="card">
-      <div class="tw">
+      <div class="cttl">Nuevo lote de venta</div>
+      <div class="form-row">
+        <div class="fg"><label>N° lote</label><input id="lv-numero" style="width:100px" placeholder="1"></div>
+        <div class="fg"><label>Fecha</label><input type="date" id="lv-fecha"></div>
+        <div class="fg"><label>Firma</label>
+          <select id="lv-firma"><option value="TABELA">TABELA</option><option value="MVE">MVE</option><option value="FIVE">FIVE</option></select>
+        </div>
+        <div class="fg"><label>Sexo</label>
+          <select id="lv-sexo"><option>Macho</option><option>Hembra</option></select>
+        </div>
+        <div class="fg"><label>Cantidad</label><input type="number" id="lv-cant" min="1" style="width:90px"></div>
+        <div class="fg"><label>Peso prom. (kg)</label><input type="number" id="lv-peso" style="width:100px" placeholder="380"></div>
+        <div class="fg"><label>Destino</label><input id="lv-destino" style="width:180px" placeholder="Frigorífico / Comprador"></div>
+        <div class="fg"><label>Observaciones</label><input id="lv-obs" style="width:220px"></div>
+        <div class="fg" style="align-self:flex-end">
+          <button class="btn btn-p" onclick="registrarLoteVenta()">Guardar lote</button>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="cttl">Lotes de venta registrados</div>
+      <div class="tw" style="margin-top:10px">
         <table>
-          <thead><tr>
-            <th>Firma</th><th>Origen</th><th>Corral</th><th>Sexo</th><th>F. Ingreso</th>
-            <th class="r">Cant.</th><th class="r">Peso ini.</th>
-            <th>F. Inicio Adapt.</th>
-            <th class="r">Esc.1 Peso</th><th>Esc.1 Salida</th><th class="r">Esc.1 Días</th>
-            <th class="r">Esc.2 Peso</th><th>Esc.2 Salida</th><th class="r">Esc.2 Días</th>
-            <th></th>
-          </tr></thead>
-          <tbody id="tr-tabla"></tbody>
+          <thead><tr><th>N° lote</th><th>Fecha</th><th>Firma</th><th>Sexo</th><th class="r">Cantidad</th><th class="r">Peso prom.</th><th>Destino</th><th>Observaciones</th><th></th></tr></thead>
+          <tbody id="lv-tabla"></tbody>
         </table>
       </div>
     </div>
   </div>
 
-  <div id="tr-ventas" class="tc">
-    <div class="card">
-      <div class="cttl">Registrar venta</div>
-      <div class="form-row">
-        <div class="fg"><label>Fecha</label><input type="date" id="vt-fecha"></div>
-        <div class="fg"><label>Tropa</label>
-          <select id="vt-tropa" onchange="autocompletarVenta()"><option value="">— elegir tropa —</option></select></div>
-        <div class="fg"><label>Corral</label>
-          <select id="vt-corral"><option value="">— elegir —</option>
-            <option>1</option><option>2</option><option>3</option><option>4</option>
-            <option>5</option><option>6</option><option>7</option><option>8</option>
-            <option>9</option><option>10</option><option>11</option><option>12</option>
-            <option>Manga</option></select></div>
-        <div class="fg"><label>Firma</label>
-          <select id="vt-firma"><option>FIVE</option><option>MVE</option><option>TABELA</option></select></div>
-        <div class="fg"><label>Sexo</label>
-          <select id="vt-sexo"><option>Machos</option><option>Hembras</option></select></div>
-        <div class="fg"><label>Cantidad</label>
-          <input type="number" id="vt-cant" value="1" min="1" style="width:80px" onchange="calcVentaTotal()"></div>
-      </div>
-      <div class="form-row">
-        <div class="fg"><label>Peso prom. salida (kg)</label>
-          <input type="number" id="vt-peso" style="width:120px" placeholder="0" onchange="calcVentaTotal()"></div>
-        <div class="fg"><label>Precio ($/kg)</label>
-          <input type="number" id="vt-precio" style="width:120px" placeholder="0" onchange="calcVentaTotal()"></div>
-        <div class="fg"><label>N° DTE</label>
-          <input type="text" id="vt-dte" style="width:130px" placeholder="Ej: 12345"></div>
-        <div class="fg"><label>Destino / Frigorífico</label>
-          <input type="text" id="vt-destino" style="width:180px" placeholder="Opcional"></div>
-        <button class="btn btn-p" onclick="registrarVenta()">Registrar venta</button>
-      </div>
-      <div id="vt-total-calc" style="display:none;margin-top:8px;padding:10px 14px;background:#e8f2e0;border-radius:4px;font-size:13px;color:#2d5016;font-weight:600"></div>
-    </div>
-    <div class="card">
-      <div class="cttl">Historial de ventas</div>
-      <div class="tw"><table>
-        <thead><tr><th>Fecha</th><th>Tropa</th><th>Corral</th><th>Firma</th><th>Sexo</th>
-          <th class="r">Cant.</th><th class="r">Peso (kg)</th><th class="r">Precio ($/kg)</th>
-          <th class="r">Total ($)</th><th>N° DTE</th><th>Destino</th><th></th></tr></thead>
-        <tbody id="vt-tabla"></tbody>
-      </table></div>
-      <div id="vt-grand-total" style="margin-top:10px;text-align:right;font-size:13px;color:#2d5016;font-weight:700"></div>
-    </div>
-  </div>
 </div>
 
 </main>
@@ -521,32 +582,56 @@ const TGRANOS=['Silo Maíz','Silo Cebada','Maíz grano','Soja','Trigo','Cebada']
 const METROS_DEFAULT={'Silo Maíz':90,'Silo Cebada':90,'Maíz grano':69,'Soja':69,'Trigo':69,'Cebada':69};
 
 const S={
-  semana:{fecha:hoy(),notas:''},
-  granos:[],
-  hacienda:{fecha:hoy(),corrales:{},corralesPrev:{}},
+  semana:{fecha:'2026-06-08',notas:''},
+  granos:[{"id": "xc9wo1", "tipo": "Silo Maíz", "cosecha": "2026", "bolsa": "Bolsa 1", "lote": "", "ubicacion": "", "kgInicial": 372360, "metrosIniciales": 90, "metrosActuales": 0, "kgActual": 372360, "kgTeorico": 372360, "fecha": "2026-06-08"}, {"id": "8szwzg", "tipo": "Silo Maíz", "cosecha": "2026", "bolsa": "Bolsa 2", "lote": "", "ubicacion": "", "kgInicial": 377360, "metrosIniciales": 90, "metrosActuales": 0, "kgActual": 377360, "kgTeorico": 377360, "fecha": "2026-06-08"}, {"id": "67b6z3", "tipo": "Silo Maíz", "cosecha": "2026", "bolsa": "Bolsa 3", "lote": "", "ubicacion": "", "kgInicial": 369700, "metrosIniciales": 90, "metrosActuales": 0, "kgActual": 369700, "kgTeorico": 369700, "fecha": "2026-06-08"}, {"id": "u85g90", "tipo": "Silo Maíz", "cosecha": "2026", "bolsa": "Bolsa 4", "lote": "", "ubicacion": "", "kgInicial": 384480, "metrosIniciales": 90, "metrosActuales": 0, "kgActual": 384480, "kgTeorico": 384480, "fecha": "2026-06-08"}, {"id": "38quq8", "tipo": "Silo Cebada", "cosecha": "2025", "bolsa": "Bolsa 1", "lote": "2/5", "ubicacion": "Lote 5", "kgInicial": 368460, "metrosIniciales": 90, "metrosActuales": 0, "kgActual": 34799, "kgTeorico": 34799, "fecha": "2026-06-08"}, {"id": "7kh4n5", "tipo": "Silo Cebada", "cosecha": "2025", "bolsa": "Bolsa 2", "lote": "6", "ubicacion": "Lote 8", "kgInicial": 373120, "metrosIniciales": 90, "metrosActuales": 0, "kgActual": 373120, "kgTeorico": 373120, "fecha": "2026-06-08"}, {"id": "odgpbn", "tipo": "Silo Cebada", "cosecha": "2025", "bolsa": "Bolsa 3", "lote": "", "ubicacion": "", "kgInicial": 376640, "metrosIniciales": 90, "metrosActuales": 0, "kgActual": 376640, "kgTeorico": 376640, "fecha": "2026-06-08"}, {"id": "5q6kra", "tipo": "Soja", "cosecha": "2025", "bolsa": "Bolsa 7", "lote": "1", "ubicacion": "Lote 5", "kgInicial": 241700, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 12668, "kgTeorico": 12668, "fecha": "2026-06-08"}, {"id": "ls2e1i", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 1", "lote": "9", "ubicacion": "9", "kgInicial": 230100, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 230100, "kgTeorico": 230100, "fecha": "2026-06-08"}, {"id": "lnseax", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 2", "lote": "9", "ubicacion": "9", "kgInicial": 230380, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 230380, "kgTeorico": 230380, "fecha": "2026-06-08"}, {"id": "s2ytgw", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 3", "lote": "9/4", "ubicacion": "5", "kgInicial": 236510, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 236510, "kgTeorico": 236510, "fecha": "2026-06-08"}, {"id": "i1njjq", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 4", "lote": "4", "ubicacion": "5", "kgInicial": 234530, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 234530, "kgTeorico": 234530, "fecha": "2026-06-08"}, {"id": "xho2gm", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 5", "lote": "1s/1n/7a", "ubicacion": "5", "kgInicial": 234250, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 234250, "kgTeorico": 234250, "fecha": "2026-06-08"}, {"id": "h13b0j", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 6", "lote": "7b", "ubicacion": "5", "kgInicial": 220500, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 220500, "kgTeorico": 220500, "fecha": "2026-06-08"}, {"id": "j8szu3", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 7", "lote": "7b", "ubicacion": "7", "kgInicial": 220000, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 220000, "kgTeorico": 220000, "fecha": "2026-06-08"}, {"id": "t5tt2p", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 8", "lote": "12", "ubicacion": "11", "kgInicial": 220300, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 220300, "kgTeorico": 220300, "fecha": "2026-06-08"}, {"id": "llalef", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 9", "lote": "12/15n", "ubicacion": "11", "kgInicial": 221800, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 221800, "kgTeorico": 221800, "fecha": "2026-06-08"}, {"id": "ux48nx", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 10", "lote": "12/15n", "ubicacion": "14", "kgInicial": 224600, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 224600, "kgTeorico": 224600, "fecha": "2026-06-08"}, {"id": "z0dwfo", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 11", "lote": "13a", "ubicacion": "13", "kgInicial": 211900, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 211900, "kgTeorico": 211900, "fecha": "2026-06-08"}, {"id": "qx3487", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 12", "lote": "3a", "ubicacion": "3a", "kgInicial": 135250, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 135250, "kgTeorico": 135250, "fecha": "2026-06-08"}, {"id": "02prt1", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 13", "lote": "11a", "ubicacion": "13", "kgInicial": 209450, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 209450, "kgTeorico": 209450, "fecha": "2026-06-08"}, {"id": "4wtcc4", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 14", "lote": "15s/11a", "ubicacion": "5", "kgInicial": 229700, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 229700, "kgTeorico": 229700, "fecha": "2026-06-08"}, {"id": "yw2vqd", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 15", "lote": "18", "ubicacion": "18", "kgInicial": 225160, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 225160, "kgTeorico": 225160, "fecha": "2026-06-08"}, {"id": "ymo848", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 16", "lote": "18/17a", "ubicacion": "18", "kgInicial": 219600, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 219600, "kgTeorico": 219600, "fecha": "2026-06-08"}, {"id": "srla5x", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 17", "lote": "17a/17b/18", "ubicacion": "18", "kgInicial": 211380, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 211380, "kgTeorico": 211380, "fecha": "2026-06-08"}, {"id": "rni3rg", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 18", "lote": "16", "ubicacion": "18", "kgInicial": 214100, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 214100, "kgTeorico": 214100, "fecha": "2026-06-08"}, {"id": "c3s68p", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 19", "lote": "7b/10b", "ubicacion": "13", "kgInicial": 212820, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 212820, "kgTeorico": 212820, "fecha": "2026-06-08"}, {"id": "ecm0t2", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 20", "lote": "12/7b/9", "ubicacion": "7", "kgInicial": 220570, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 220570, "kgTeorico": 220570, "fecha": "2026-06-08"}, {"id": "xaidnn", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 21", "lote": "12/7b/9", "ubicacion": "5", "kgInicial": 86150, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 86150, "kgTeorico": 86150, "fecha": "2026-06-08"}, {"id": "imagjg", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 22", "lote": "3a/6a", "ubicacion": "3a", "kgInicial": 83950, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 83950, "kgTeorico": 83950, "fecha": "2026-06-08"}, {"id": "0m0v1b", "tipo": "Soja", "cosecha": "2026", "bolsa": "Bolsa 23", "lote": "3a", "ubicacion": "3a", "kgInicial": 19100, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 19100, "kgTeorico": 19100, "fecha": "2026-06-08"}, {"id": "qymab1", "tipo": "Trigo", "cosecha": "2025", "bolsa": "Bolsa 1", "lote": "11a", "ubicacion": "Lote 11", "kgInicial": 237600, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 237600, "kgTeorico": 237600, "fecha": "2026-06-08"}, {"id": "1ulidv", "tipo": "Trigo", "cosecha": "2025", "bolsa": "Bolsa 4", "lote": "18", "ubicacion": "Lote 13", "kgInicial": 230750, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 230750, "kgTeorico": 230750, "fecha": "2026-06-08"}, {"id": "a7jjob", "tipo": "Trigo", "cosecha": "2025", "bolsa": "Bolsa 5", "lote": "18", "ubicacion": "Lote 10", "kgInicial": 240350, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 240350, "kgTeorico": 240350, "fecha": "2026-06-08"}, {"id": "qu1pea", "tipo": "Trigo", "cosecha": "2025", "bolsa": "Bolsa 6", "lote": "17", "ubicacion": "Lote 3", "kgInicial": 250170, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 72921, "kgTeorico": 72921, "fecha": "2026-06-08"}, {"id": "5daqek", "tipo": "Cebada", "cosecha": "2025", "bolsa": "Bolsa 2", "lote": "13/6/5 bajo", "ubicacion": "Feed lot", "kgInicial": 86100, "metrosIniciales": 69, "metrosActuales": 0, "kgActual": 86100, "kgTeorico": 86100, "fecha": "2026-06-08"}],
+  hacienda:{fecha:'2026-06-08',corrales:{"1": {"cat": "Recría", "total": 182, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 0, "tab_m": 0, "tab_h": 182}, "2": {"cat": "Engorde NOV", "total": 130, "five_m": 24, "five_h": 0, "mve_m": 53, "mve_h": 0, "tab_m": 53, "tab_h": 0}, "3": {"cat": "Recría", "total": 78, "five_m": 0, "five_h": 78, "mve_m": 0, "mve_h": 0, "tab_m": 0, "tab_h": 0}, "4": {"cat": "Recría", "total": 90, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 90, "tab_m": 0, "tab_h": 0}, "5": {"cat": "Recría", "total": 135, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 0, "tab_m": 135, "tab_h": 0}, "6": {"cat": "Engorde VQ", "total": 151, "five_m": 0, "five_h": 129, "mve_m": 0, "mve_h": 18, "tab_m": 0, "tab_h": 4}, "7": {"cat": "Recría", "total": 67, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 0, "tab_m": 0, "tab_h": 67}, "8": {"cat": "Recría", "total": 134, "five_m": 30, "five_h": 45, "mve_m": 0, "mve_h": 0, "tab_m": 35, "tab_h": 24}, "9": {"cat": "Recría", "total": 63, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 63, "tab_m": 0, "tab_h": 0}, "10": {"cat": "Recría", "total": 112, "five_m": 112, "five_h": 0, "mve_m": 0, "mve_h": 0, "tab_m": 0, "tab_h": 0}, "11": {"cat": "", "total": 0, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 0, "tab_m": 0, "tab_h": 0}, "12": {"cat": "Recría", "total": 145, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 0, "tab_m": 145, "tab_h": 0}, "Manga": {"cat": "", "total": 0, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 0, "tab_m": 0, "tab_h": 0}},corralesPrev:{}},
   movimientos:[],
-  dieta:{kgan:{recria:11,engvq:12.5,engnov:13,adapt:10},ingredientes:[
-    {n:'Pellet de Gs',   p:{recria:12,  engvq:9,   engnov:9,   adapt:9}},
-    {n:'Silo Cebada',   p:{recria:77.5,engvq:25,  engnov:25,  adapt:30}},
-    {n:'Silo Maíz',     p:{recria:0,   engvq:0,   engnov:0,   adapt:0}},
-    {n:'Maíz grano',    p:{recria:9,   engvq:63.7,engnov:63.7,adapt:50}},
-    {n:'Cebada',        p:{recria:0,   engvq:0,   engnov:0,   adapt:0}},
-    {n:'Expeller Soja', p:{recria:0,   engvq:0,   engnov:0,   adapt:0}},
-    {n:'Núcleo Terneros',p:{recria:1,  engvq:0,   engnov:0,   adapt:1}},
-    {n:'Núcleo FSU',    p:{recria:0,   engvq:1.5, engnov:1.5, adapt:0}},
-    {n:'Urea',          p:{recria:.5,  engvq:.8,  engnov:.8,  adapt:.5}},
-    {n:'Hotelería',     p:{recria:0,   engvq:0,   engnov:0,   adapt:9.5}},
-  ]},
-  alimentos:[],
-  costos:{dolar:1394,ptro:6000,ptra:5700,pvn:5000,pvv:4700,precios:{}},
-  historial:[]  // [{fecha, label, granos, hacienda, movimientos, alimentos, costos, notas}]
+  dieta:{kgan:{"recria": 12.5, "engvq": 13.9, "engnov": 13.9, "adapt": 11.7},ingredientes:[{"n": "Pellet de Gs", "p": {"recria": 12.0, "engvq": 8.95, "engnov": 7.0, "adapt": 11.0}}, {"n": "Silo Cebada", "p": {"recria": 0, "engvq": 28.9, "engnov": 0, "adapt": 0}}, {"n": "Silo Maíz", "p": {"recria": 77.0, "engvq": 0, "engnov": 30.0, "adapt": 46.7}}, {"n": "Maíz grano", "p": {"recria": 9.0, "engvq": 60.61, "engnov": 47.0, "adapt": 41.0}}, {"n": "Cebada", "p": {"recria": 0, "engvq": 0, "engnov": 0, "adapt": 0}}, {"n": "Expeller Soja", "p": {"recria": 0, "engvq": 0, "engnov": 0, "adapt": 0}}, {"n": "Núcleo Terneros", "p": {"recria": 1.0, "engvq": 0, "engnov": 1.0, "adapt": 1.3}}, {"n": "Núcleo FSU", "p": {"recria": 0, "engvq": 0.77, "engnov": 0, "adapt": 0}}, {"n": "Urea", "p": {"recria": 1.0, "engvq": 0.77, "engnov": 1.0, "adapt": 0.0}}, {"n": "Hotelería", "p": {"recria": 0, "engvq": 0, "engnov": 0, "adapt": 0}}]},
+  alimentos:[{"id": "x6x6wl", "nombre": "Pellet de Gs", "stock": 21560, "fecha": "2026-06-08"}, {"id": "mwerkc", "nombre": "Núcleo Terneros", "stock": 0, "fecha": "2026-06-08"}, {"id": "o54ko8", "nombre": "Núcleo FSU", "stock": 0, "fecha": "2026-06-08"}, {"id": "5j3lxl", "nombre": "Urea", "stock": 0, "fecha": "2026-06-08"}, {"id": "jy1pwj", "nombre": "Expeller Soja", "stock": 0, "fecha": "2026-06-08"}],
+  costos:{"dolar": 1446.5, "ptro": 5900, "ptra": 5600, "pvn": 4700, "pvv": 4500, "precios": {"Pellet de Gs": 222, "Silo Cebada": 115.72, "Silo Maíz": 76, "Maíz grano": 179.032, "Cebada": 0, "Expeller Soja": 0, "Núcleo Terneros": 449, "Núcleo FSU": 573.624, "Urea": 818.719, "Hotelería": 0}},
+  historial:[],
+  lotesVenta:[],
+  tropas:[],
+  muertes:[],
+  ventas:[]
 };
 
+const _DEFAULT_ALIMENTOS=[{"id":"x6x6wl","nombre":"Pellet de Gs","stock":21560,"fecha":"2026-06-08"},{"id":"mwerkc","nombre":"N\u00facleo Terneros","stock":0,"fecha":"2026-06-08"},{"id":"o54ko8","nombre":"N\u00facleo FSU","stock":0,"fecha":"2026-06-08"},{"id":"5j3lxl","nombre":"Urea","stock":0,"fecha":"2026-06-08"},{"id":"jy1pwj","nombre":"Expeller Soja","stock":0,"fecha":"2026-06-08"}];
 function hoy(){return new Date().toISOString().slice(0,10);}
 // ── SUPABASE CONFIG ──
 const SB_URL = 'https://crviqxblfzmfkusnhkcl.supabase.co';
 const SB_KEY = 'sb_publishable_vuECZNWl2Mc_kOtYlzX3Sw_PbwxBhUP';
 const IS_READONLY = new URLSearchParams(window.location.search).get('modo') === 'lectura';
+if(!IS_READONLY){const _pb=document.getElementById('btn-publicar');if(_pb)_pb.style.display='';const _ej=document.getElementById('btn-exportjson');if(_ej)_ej.style.display='';}
+if(IS_READONLY){const _br=document.getElementById('btn-refresh');if(_br)_br.style.display='';}
+
+// ── LOGIN GATE (solo lectura) ──
+const READONLY_PASSWORD='LaFe2026';
+function checkLoginGate(){
+  if(!IS_READONLY)return;
+  const gate=document.getElementById('login-gate');
+  if(!gate)return;
+  const ok=localStorage.getItem('lafe_gate_ok')==='1';
+  if(ok){gate.style.display='none';}
+  else{
+    gate.style.display='flex';
+    const p=document.getElementById('lg-pass');
+    if(p)setTimeout(()=>p.focus(),50);
+  }
+}
+function intentarLogin(){
+  const val=document.getElementById('lg-pass').value;
+  if(val===READONLY_PASSWORD){
+    localStorage.setItem('lafe_gate_ok','1');
+    document.getElementById('login-gate').style.display='none';
+    document.getElementById('lg-error').style.display='none';
+  } else {
+    document.getElementById('lg-error').style.display='block';
+    document.getElementById('lg-pass').value='';
+    document.getElementById('lg-pass').focus();
+  }
+}
+checkLoginGate();
 
 async function sbFetch(path, options={}){
   const res = await fetch(SB_URL+'/rest/v1/'+path, {
@@ -583,12 +668,19 @@ async function loadFromCloud(){
       if(p.hacienda)Object.assign(S.hacienda,p.hacienda);
       if(p.movimientos)S.movimientos=p.movimientos;
       if(p.dieta){if(p.dieta.kgan)Object.assign(S.dieta.kgan,p.dieta.kgan);if(p.dieta.ingredientes)S.dieta.ingredientes=p.dieta.ingredientes;}
-      if(p.alimentos)S.alimentos=p.alimentos;
+      if(p.alimentos&&p.alimentos.length)S.alimentos=p.alimentos;
       if(p.costos)Object.assign(S.costos,p.costos);
       if(p.historial)S.historial=p.historial;
-    if(p.tropas)S.tropas=p.tropas;
-    if(p.muertes)S.muertes=p.muertes;
-    if(p.ventas)S.ventas=p.ventas;
+    if(p.tropas&&p.tropas.length)S.tropas=p.tropas;
+    if(p.muertes&&p.muertes.length)S.muertes=p.muertes;
+    if(p.ventas&&p.ventas.length)S.ventas=p.ventas;
+    if(p.lotesVenta&&p.lotesVenta.length)S.lotesVenta=p.lotesVenta;
+    // Migrate Pellet GS → Pellet de Gs
+    S.alimentos.forEach(a=>{if(a.nombre==='Pellet GS')a.nombre='Pellet de Gs';});
+    // If localStorage alimentos is empty, restore from defaults
+    if(S.alimentos.length===0&&typeof _DEFAULT_ALIMENTOS!=='undefined'){
+      S.alimentos=JSON.parse(JSON.stringify(_DEFAULT_ALIMENTOS));
+    }
       return true;
     }
   } catch(e){ console.error('Load error:', e); }
@@ -597,25 +689,30 @@ async function loadFromCloud(){
 
 function save(){
   _unsaved=true;
-  try{localStorage.setItem('lafé3',JSON.stringify(S))}catch(e){}
+  try{localStorage.setItem('lafé5',JSON.stringify(S))}catch(e){}
   if(!IS_READONLY) syncToCloud().then(()=>{_unsaved=false;}).catch(()=>{});
 }
 
 function load(){
   try{
-    const d=localStorage.getItem('lafé3');if(!d)return;
+    const d=localStorage.getItem('lafé5');if(!d)return;
     const p=JSON.parse(d);
+    // Validar: solo cargar si hay datos reales (animales o granos)
+    const totAnim=p.hacienda&&p.hacienda.corrales?Object.values(p.hacienda.corrales).reduce((s,c)=>s+(Number(c.total)||0),0):0;
+    const totGranos=p.granos?p.granos.length:0;
+    if(totAnim===0&&totGranos===0)return; // datos vacíos — ignorar
     if(p.semana)Object.assign(S.semana,p.semana);
-    if(p.granos)S.granos=p.granos;
+    if(p.granos&&p.granos.length)S.granos=p.granos;
     if(p.hacienda)Object.assign(S.hacienda,p.hacienda);
     if(p.movimientos)S.movimientos=p.movimientos;
     if(p.dieta){if(p.dieta.kgan)Object.assign(S.dieta.kgan,p.dieta.kgan);if(p.dieta.ingredientes)S.dieta.ingredientes=p.dieta.ingredientes;}
-    if(p.alimentos)S.alimentos=p.alimentos;
+    if(p.alimentos&&p.alimentos.length)S.alimentos=p.alimentos;
     if(p.costos)Object.assign(S.costos,p.costos);
     if(p.historial)S.historial=p.historial;
-  if(p.tropas)S.tropas=p.tropas;
-  if(p.muertes)S.muertes=p.muertes;
-  if(p.ventas)S.ventas=p.ventas;
+    if(p.tropas&&p.tropas.length)S.tropas=p.tropas;
+    if(p.muertes&&p.muertes.length)S.muertes=p.muertes;
+    if(p.ventas&&p.ventas.length)S.ventas=p.ventas;
+    if(p.lotesVenta&&p.lotesVenta.length)S.lotesVenta=p.lotesVenta;
   }catch(e){}
 }
 
@@ -670,7 +767,22 @@ function badgeDias(dias){
   if(dias<30)return`<span class="badge bi">OK ${f1(dias)}d</span>`;
   return`<span class="badge bg">Bien ${f1(dias)}d</span>`;
 }
-function updMetrosDefault(){
+function updKgFromMetros(){
+  // When metros changes, calculate kg and show in direct field
+  const kgIni=Number(document.getElementById('g-kgini').value)||0;
+  const mIni=Number(document.getElementById('g-mini').value)||METROS_DEFAULT[document.getElementById('g-tipo').value]||69;
+  const mAct=Number(document.getElementById('g-mact').value)||0;
+  if(kgIni&&mIni&&mAct){
+    const kg=Math.round(kgIni*(mAct/mIni));
+    document.getElementById('g-kgact-directo').value=kg;
+  }
+}
+function updMetrosFromKg(){
+  // When typing kg directly, clear metros field to avoid conflict
+  const val=document.getElementById('g-kgact-directo').value.trim();
+  if(val!=='') document.getElementById('g-mact').value='';
+}
+function updTipoChange(){
   const tipo=document.getElementById('g-tipo').value;
   const el=document.getElementById('g-mini');
   if(el)el.value=METROS_DEFAULT[tipo]||69;
@@ -680,6 +792,15 @@ function updMetrosDefault(){
 async function refreshData(){
   const btn=document.getElementById('btn-refresh');
   if(btn){btn.textContent='⏳ Cargando...';btn.disabled=true;}
+  // In readonly mode: pull the latest saved week from Supabase
+  if(IS_READONLY){
+    const foundRO=await loadFromCloud();
+    if(!foundRO) preloadData();
+    CORRALES.forEach(c=>{if(!S.hacienda.corrales[c])S.hacienda.corrales[c]={cat:'',total:0,five_m:0,five_h:0,mve_m:0,mve_h:0,tab_m:0,tab_h:0};});
+    renderDash();
+    if(btn){btn.textContent='🔄 Actualizar';btn.disabled=false;}
+    return;
+  }
   const found=await loadFromCloud();
   if(found){
     CORRALES.forEach(c=>{if(!S.hacienda.corrales[c])S.hacienda.corrales[c]={cat:'',total:0,five_m:0,five_h:0,mve_m:0,mve_h:0,tab_m:0,tab_h:0};});
@@ -690,6 +811,13 @@ async function refreshData(){
 
 function guardarSemana(){
   if(!S.semana.fecha){alert('Poné la fecha de la semana primero');return;}
+  // Calcular totales por firma
+  const firmasTots={FIVE:{m:0,h:0},MVE:{m:0,h:0},TABELA:{m:0,h:0}};
+  CORRALES.forEach(c=>{const d=S.hacienda.corrales[c]||{};
+    firmasTots.FIVE.m+=Number(d.five_m||0);firmasTots.FIVE.h+=Number(d.five_h||0);
+    firmasTots.MVE.m+=Number(d.mve_m||0);firmasTots.MVE.h+=Number(d.mve_h||0);
+    firmasTots.TABELA.m+=Number(d.tab_m||0);firmasTots.TABELA.h+=Number(d.tab_h||0);
+  });
   const snapshot={
     id:uid(),
     fecha:S.semana.fecha,
@@ -698,16 +826,22 @@ function guardarSemana(){
     granos:JSON.parse(JSON.stringify(S.granos)),
     hacienda:JSON.parse(JSON.stringify(S.hacienda)),
     hacTots:getHacTots(),
+    hacFirmas:JSON.parse(JSON.stringify(firmasTots)),
     movimientos:JSON.parse(JSON.stringify(S.movimientos.filter(m=>m.fecha===S.semana.fecha))),
     alimentos:JSON.parse(JSON.stringify(S.alimentos)),
     costos:JSON.parse(JSON.stringify(S.costos)),
     dieta:JSON.parse(JSON.stringify(S.dieta))
   };
   // Remove existing snapshot for same date
+  const eraExistente=S.historial.some(h=>h.fecha===S.semana.fecha);
   S.historial=S.historial.filter(h=>h.fecha!==S.semana.fecha);
   S.historial.unshift(snapshot);
   save();
-  alert('✓ Semana '+S.semana.fecha+' guardada en el historial');
+  if(eraExistente){
+    alert('✓ Semana '+S.semana.fecha+' actualizada en el historial.\n\nPara guardar la PRÓXIMA semana, cambiá la fecha "Semana al" en el dashboard antes de guardar.');
+  } else {
+    alert('✓ Semana '+S.semana.fecha+' guardada en el historial ('+S.historial.length+' semanas guardadas)');
+  }
 }
 
 // ── DASHBOARD ──
@@ -718,8 +852,10 @@ function renderDash(){
   document.getElementById('d-rec').textContent=f(t.recria);
   document.getElementById('d-eng').textContent=f(t.engvq+t.engnov);
   document.getElementById('d-cor').textContent=CORRALES.filter(c=>(S.hacienda.corrales[c]||{}).total>0).length+'/'+CORRALES.length;
-  [['Silo Maíz','d-sm'],['Silo Cebada','d-sc'],['Maíz grano','d-mg'],['Soja','d-sj']].forEach(([tipo,id])=>{
-    document.getElementById(id).textContent=f(S.granos.filter(g=>g.tipo===tipo).reduce((s,g)=>s+Number(g.kgActual||0),0));
+  [['Silo Maíz','d-sm'],['Silo Cebada','d-sc'],['Maíz grano','d-mg'],['Soja','d-sj'],['Trigo','d-tr'],['Cebada','d-ceb']].forEach(([tipo,id])=>{
+    const el=document.getElementById(id);if(!el)return;
+    const tot=S.granos.filter(g=>g.tipo===tipo).reduce((s,g)=>s+Number(g.kgActual||0),0);
+    el.textContent=tot>0?f(tot):'—';
   });
   let alerts='',diasH='';
   S.dieta.ingredientes.forEach(ing=>{
@@ -745,8 +881,12 @@ function addGrano(){
   const tipo=document.getElementById('g-tipo').value;
   const kgInicial=Number(document.getElementById('g-kgini').value)||0;
   const metrosIniciales=Number(document.getElementById('g-mini').value)||METROS_DEFAULT[tipo]||69;
-  const metrosActuales=Number(document.getElementById('g-mact').value)||metrosIniciales;
-  const kgActual=kgInicial>0?Math.round(kgInicial*(metrosActuales/metrosIniciales)):0;
+  const metrosActuales=Number(document.getElementById('g-mact').value)||0;
+  const kgDirectoStr=document.getElementById('g-kgact-directo').value.trim();
+  const kgDirecto=kgDirectoStr!==''?Number(kgDirectoStr):null;
+  // If user typed kg directly → use that. If metros entered → calculate. Otherwise 0.
+  const kgActual = kgDirecto!==null ? kgDirecto :
+    (kgInicial>0&&metrosActuales>0) ? Math.round(kgInicial*(metrosActuales/metrosIniciales)) : 0;
 
   if(editingGranoId){
     // Update existing
@@ -768,7 +908,7 @@ function addGrano(){
       kgActual,kgTeorico:kgActual,fecha:document.getElementById('g-fec').value});
   }
   save();renderGranos();
-  ['g-bolsa','g-lote','g-ubic','g-kgini','g-mact'].forEach(id=>document.getElementById(id).value='');
+  ['g-bolsa','g-lote','g-ubic','g-kgini','g-mact','g-kgact-directo'].forEach(id=>document.getElementById(id).value='');
 }
 function delGrano(id){if(confirm('¿Eliminar esta bolsa?')){S.granos=S.granos.filter(g=>g.id!==id);save();renderGranos();}}
 
@@ -786,6 +926,7 @@ function editGrano(id){
   document.getElementById('g-kgini').value=g.kgInicial||'';
   document.getElementById('g-mini').value=g.metrosIniciales||'';
   document.getElementById('g-mact').value=g.metrosActuales||'';
+  document.getElementById('g-kgact-directo').value=g.kgActual||'';
   document.getElementById('g-fec').value=g.fecha||hoy();
   // Update form title and button
   const ttl=document.getElementById('g-form-ttl');
@@ -819,11 +960,10 @@ function renderGranos(){
           <td class="r" style="font-weight:700;color:#2d5016">${f(g.kgActual)}</td>
           <td>${g.fecha||'—'}</td>
           <td style="white-space:nowrap">
-            <button class="btn btn-sm" onclick="editGrano('${g.id}')" style="margin-right:4px">✏️</button>
             <button class="btn btn-sm" onclick="editGrano('${g.id}')" style="margin-right:3px">✏️</button><button class="btn btn-sm btn-d" onclick="delGrano('${g.id}')">✕</button>
           </td>
         </tr>`).join('')}</tbody>
-        <tfoot><tr class="tr-tot"><td colspan="${esSilo?6:3}">TOTAL</td><td class="r">${f(tot)}</td><td colspan="2"></td></tr></tfoot>
+        <tfoot><tr class="tr-tot"><td colspan="${esSilo?7:5}">TOTAL</td><td class="r">${f(tot)}</td><td colspan="2"></td></tr></tfoot>
       </table></div></div>`;
   }).join('');
   renderMedicion();
@@ -907,21 +1047,24 @@ function renderComparacion(){
 function renderHacienda(){
   CORRALES.forEach(c=>{if(!S.hacienda.corrales[c])S.hacienda.corrales[c]={cat:'',total:0,five_m:0,five_h:0,mve_m:0,mve_h:0,tab_m:0,tab_h:0};});
   const hf=document.getElementById('h-fec');if(hf&&!hf.value)hf.value=S.hacienda.fecha;
-  renderCorrForm();renderCorrDisp();renderHacTots();renderMovTbl();renderVariacion();
+  renderCorrForm();renderHacTots();renderMovTbl();renderVariacion();
   const n=document.getElementById('h-notas');if(n)n.value=S.semana.notas||'';
 }
 function renderCorrForm(){
   const cont=document.getElementById('corr-form');if(!cont)return;
-  let h='<div class="tw" style="margin-top:10px"><table><thead><tr><th>Corral</th><th>Categoría</th><th class="r">Total</th><th class="r">FIVE M</th><th class="r">FIVE H</th><th class="r">MVE M</th><th class="r">MVE H</th><th class="r">TAB M</th><th class="r">TAB H</th><th class="r">Peso est.</th><th>Salida est.</th><th style="color:#1a3a5c">📅 1er salida (tropas)</th></tr></thead><tbody>';
+  let h='<div class="tw" style="margin-top:10px"><table><thead><tr><th>Corral</th><th>Categoría</th><th class="r">Total</th><th class="r">FIVE M</th><th class="r">FIVE H</th><th class="r">MVE M</th><th class="r">MVE H</th><th class="r">TAB M</th><th class="r">TAB H</th><th class="r">Peso est.</th><th style="color:#1a3a5c">📅 1ra salida</th><th style="color:#843c0c">📅 2da salida</th></tr></thead><tbody>';
   CORRALES.forEach(c=>{const d=S.hacienda.corrales[c]||{};
+    const cRef=typeof c==='string'?`'${c}'`:c;
     h+=`<tr><td style="font-weight:600">Corral ${c}</td>
-      <td><select onchange="updC(${JSON.stringify(c)},'cat',this.value)" style="width:120px">${CATS.map(cat=>`<option${d.cat===cat?' selected':''}>${cat}</option>`).join('')}</select></td>
+      <td><select onchange="updC(${cRef},'cat',this.value)" style="width:120px">${CATS.map(cat=>`<option${d.cat===cat?' selected':''}>${cat}</option>`).join('')}</select></td>
       <td class="r" style="font-weight:600" id="ct-${c}">${f(d.total||0)}</td>`;
     ['five_m','five_h','mve_m','mve_h','tab_m','tab_h'].forEach(k=>
-      h+=`<td><input type="number" value="${d[k]||0}" min="0" style="width:58px;text-align:right" onchange="updC(${JSON.stringify(c)},'${k}',this.value)"></td>`);
-    h+=`<td><input type="number" value="${d.pesoEst||''}" placeholder="—" style="width:80px;text-align:right" onchange="updC(${JSON.stringify(c)},'pesoEst',this.value)"></td>
-      <td><input type="date" value="${d.fechaSalida||''}" style="width:120px" onchange="updC(${JSON.stringify(c)},'fechaSalida',this.value)"></td>
-      <td style="font-weight:600;color:#1a3a5c;white-space:nowrap">${getEarliestSalida(c)||'—'}</td></tr>`;
+      h+=`<td><input type="number" value="${d[k]||0}" min="0" style="width:58px;text-align:right" onchange="updC(${cRef},'${k}',this.value)"></td>`);
+    const pesoCalc=getPesoEstCorral(c);
+    const pesoTxt=pesoCalc!==null?pesoCalc:(d.pesoEst||'—');
+    h+=`<td style="font-weight:600;color:#2d6a4f;text-align:right;padding-right:8px" title="${pesoCalc!==null?'Calculado de tropas':''}">${pesoTxt}</td>
+      <td style="font-weight:600;color:#1a3a5c;white-space:nowrap">${getSalida(c,1)||'—'}</td>
+      <td style="font-weight:600;color:#843c0c;white-space:nowrap">${getSalida(c,2)||'—'}</td></tr>`;
   });
   cont.innerHTML=h+'</tbody></table></div>';
 }
@@ -937,14 +1080,63 @@ function saveHac(){
   const hf=document.getElementById('h-fec');if(hf)S.hacienda.fecha=hf.value;
   save();renderCorrDisp();renderHacTots();renderVariacion();renderDash();
 }
-function getEarliestSalida(corral){
-  // Find all tropas in this corral, return earliest fsal1
-  const tropasCorral=(S.tropas||[]).filter(t=>String(t.corral)===String(corral)&&t.fsal1&&t.fsal1!=='—');
+function parseDMY(s){if(!s||s==='—')return new Date(9999,0,1);const p=s.split('/');return new Date(p[2],p[1]-1,p[0]);}
+function getSalida(corral,esc){
+  // esc=1 -> fsal1, esc=2 -> fsal2
+  const field=esc===2?'fsal2':'fsal1';
+  const tropasCorral=(S.tropas||[]).filter(t=>String(t.corral)===String(corral)&&t[field]&&t[field]!=='—');
   if(!tropasCorral.length)return null;
-  // Parse DD/MM/YYYY dates
-  function parseDate(s){const p=s.split('/');return new Date(p[2],p[1]-1,p[0]);}
-  const sorted=tropasCorral.sort((a,b)=>parseDate(a.fsal1)-parseDate(b.fsal1));
-  return sorted[0].fsal1;
+  const sorted=tropasCorral.sort((a,b)=>parseDMY(a[field])-parseDMY(b[field]));
+  return sorted[0][field];
+}
+function getEarliestSalida(corral){return getSalida(corral,1);}
+
+function calcPesoActual(t){
+  // Estimates current live weight of a tropa based on phase progression
+  if(!t.fingreso||!t.pesoIni)return null;
+  const hoy=new Date(); hoy.setHours(0,0,0,0);
+  const fi=new Date(t.fingreso); fi.setHours(0,0,0,0);
+  if(hoy<fi)return t.pesoIni;
+  const dias=function(d1,d2){return Math.round((d2-d1)/(1000*60*60*24));};
+  // Phase boundary dates (saved as DD/MM/YYYY)
+  const fadp=parseDMY(t.fechaAdp);  // recría ends / adaptación starts
+  const feng=parseDMY(t.fechaEng);  // adaptación ends / engorde starts
+  const fsal=parseDMY(t.fsal1);     // expected 1st exit
+  // Default transition weight (pcam) — used for recría/adaptación interpolation
+  const pcam=t.sexo==='Machos'?270:240;
+  const diasAdpFase=dias(fadp,feng);
+  const pesoEng=pcam+(diasAdpFase>0?0.5*diasAdpFase:7); // pcam + adpvA*diasAdp
+  if(hoy<=fadp){
+    // Recría phase
+    const diasRec=dias(fi,fadp);
+    if(diasRec<=0)return Math.round(t.pesoIni);
+    const adpvR=(pcam-t.pesoIni)/diasRec;
+    return Math.round(t.pesoIni+dias(fi,hoy)*adpvR);
+  } else if(hoy<=feng){
+    // Adaptación phase
+    if(diasAdpFase<=0)return Math.round(pcam);
+    const adpvA=(pesoEng-pcam)/diasAdpFase;
+    return Math.round(pcam+dias(fadp,hoy)*adpvA);
+  } else {
+    // Engorde phase — derive adpvE from actual dates and target pv1
+    const diasEng=dias(feng,fsal);
+    if(diasEng<=0||!t.pv1)return Math.round(pesoEng);
+    const adpvE=(t.pv1-pesoEng)/diasEng;
+    return Math.round(pesoEng+dias(feng,hoy)*adpvE);
+  }
+}
+
+function getPesoEstCorral(corral){
+  // Weighted average estimated peso for a corral across all its tropas
+  const ts=(S.tropas||[]).filter(t=>String(t.corral)===String(corral));
+  if(!ts.length)return null;
+  let sumPeso=0,sumCant=0;
+  ts.forEach(function(t){
+    const p=calcPesoActual(t);
+    const n=t.cant||1;
+    if(p!==null){sumPeso+=p*n;sumCant+=n;}
+  });
+  return sumCant>0?Math.round(sumPeso/sumCant):null;
 }
 
 function renderCorrDisp(){
@@ -970,23 +1162,28 @@ function renderHacTots(){
   </div>`;
 }
 function addMov(){
+  const corralVal=document.getElementById('mv-corral').value;
   const m={
-    tipo:document.getElementById('mv-tipo').value,
+    tipo:'Muerte',
     cantidad:Number(document.getElementById('mv-cant').value)||0,
     desc:document.getElementById('mv-desc').value,
-    fecha:document.getElementById('mv-fec').value||hoy()
+    fecha:document.getElementById('mv-fec').value||hoy(),
+    corral:corralVal||undefined,
+    firma:document.getElementById('mv-firma').value,
+    sexo:document.getElementById('mv-sexo').value
   };
   if(editingMovId){
     const idx=S.movimientos.findIndex(x=>x.id===editingMovId);
     if(idx>=0) S.movimientos[idx]={...S.movimientos[idx],...m};
     editingMovId=null;
     const btn=document.getElementById('mv-save-btn');
-    if(btn){btn.textContent='Registrar';btn.style.background='';btn.style.borderColor='';}
+    if(btn){btn.textContent='Registrar muerte';btn.style.background='';btn.style.borderColor='';}
   } else {
     S.movimientos.unshift({id:uid(),...m});
   }
   save();renderMovTbl();
   document.getElementById('mv-cant').value='';document.getElementById('mv-desc').value='';
+  document.getElementById('mv-corral').value='';
 }
 function delMov(id){S.movimientos=S.movimientos.filter(m=>m.id!==id);save();renderMovTbl();}
 
@@ -994,7 +1191,9 @@ let editingMovId=null;
 function editMov(id){
   const m=S.movimientos.find(x=>x.id===id);if(!m)return;
   editingMovId=id;
-  document.getElementById('mv-tipo').value=m.tipo;
+  document.getElementById('mv-corral').value=m.corral||'';
+  document.getElementById('mv-firma').value=m.firma||'FIVE';
+  document.getElementById('mv-sexo').value=m.sexo||'Machos';
   document.getElementById('mv-cant').value=m.cantidad;
   document.getElementById('mv-desc').value=m.desc||'';
   document.getElementById('mv-fec').value=m.fecha||hoy();
@@ -1005,11 +1204,11 @@ function editMov(id){
 }
 function renderMovTbl(){
   const tb=document.getElementById('mov-tbl');if(!tb)return;
-  tb.innerHTML=S.movimientos.slice(0,60).map(m=>`<tr>
-    <td>${m.fecha||'—'}</td><td><span class="badge bi">${m.tipo}</span></td>
+  tb.innerHTML=[...S.movimientos].sort((a,b)=>b.fecha>a.fecha?1:b.fecha<a.fecha?-1:0).slice(0,60).map(m=>`<tr>
+    <td>${m.fecha||'—'}</td><td>${m.corral?'Corral '+m.corral:'—'}</td><td>${m.firma||'—'}</td><td>${m.sexo||'—'}</td>
     <td class="r" style="font-weight:600">${f(m.cantidad)}</td><td>${m.desc||'—'}</td>
     <td style="white-space:nowrap"><button class="btn btn-sm" onclick="editMov('${m.id}')" style="margin-right:3px">✏️</button><button class="btn btn-sm btn-d" onclick="delMov('${m.id}')">✕</button></td>
-  </tr>`).join('')||'<tr><td colspan="5" class="empty">Sin movimientos</td></tr>';
+  </tr>`).join('')||'<tr><td colspan="7" class="empty">Sin muertes registradas</td></tr>';
 }
 function renderVariacion(){
   const el=document.getElementById('h-var');if(!el)return;
@@ -1073,8 +1272,8 @@ function renderConsumo(){
   const body=document.getElementById('cons-body');if(!body)return;
   let td=0;
   body.innerHTML=S.dieta.ingredientes.map(ing=>{const d=getCD(ing);td+=d;
-    return`<tr><td style="font-weight:500">${ing.n}</td><td class="r">${f1(d)}</td><td class="r">${f1(d*7)}</td><td class="r">${f1(d/2)}</td></tr>`;}).join('');
-  body.innerHTML+=`<tr class="tr-tot"><td>Total</td><td class="r">${f1(td)}</td><td class="r">${f1(td*7)}</td><td class="r">${f1(td/2)}</td></tr>`;
+    return`<tr><td style="font-weight:500">${ing.n}</td><td class="r">${f1(d)}</td><td class="r">${f1(d*7)}</td></tr>`;}).join('');
+  body.innerHTML+=`<tr class="tr-tot"><td>Total</td><td class="r">${f1(td)}</td><td class="r">${f1(td*7)}</td></tr>`;
 }
 
 // ── ALIMENTOS ──
@@ -1126,6 +1325,8 @@ function renderAlimentos(){
 function renderCostos(){
   [['c-dol','dolar'],['c-tro','ptro'],['c-tra','ptra'],['c-pvn','pvn'],['c-pvv','pvv']].forEach(([id,k])=>{
     const el=document.getElementById(id);if(el)el.value=S.costos[k]||0;});
+  [['c-dr-n','dRN',90],['c-dr-v','dRV',90],['c-da','dA',14],['c-de-n','dEN',100],['c-de-v','dEV',100]].forEach(([id,k,def])=>{
+    const el=document.getElementById(id);if(el)el.value=S.costos[k]??def;});
   const cont=document.getElementById('c-prec');if(!cont)return;
   cont.innerHTML=S.dieta.ingredientes.map(ing=>`<div class="fg"><label>${ing.n}</label>
     <input type="number" value="${S.costos.precios[ing.n]||0}" step="0.01" style="width:100px"
@@ -1136,17 +1337,27 @@ function recalcC(){
   [['c-dol','dolar'],['c-tro','ptro'],['c-tra','ptra'],['c-pvn','pvn'],['c-pvv','pvv']].forEach(([id,k])=>{
     const el=document.getElementById(id);if(el)S.costos[k]=Number(el.value)||0;});
   save();
-  const k=S.dieta.kgan;const dR=90,dE=100;
-  function calcCat(catE,pesoV,pesoE,ptro,pv){
-    let cR=0,cE=0;
+  const k=S.dieta.kgan;
+  const _gd=(id,def)=>{const el=document.getElementById(id);return(el&&el.value!=='')?Number(el.value):def;};
+  const dRN=_gd('c-dr-n',90);
+  const dRV=_gd('c-dr-v',90);
+  const dA=_gd('c-da',14);
+  const dEN=_gd('c-de-n',100);
+  const dEV=_gd('c-de-v',100);
+  S.costos.dRN=dRN;S.costos.dRV=dRV;S.costos.dA=dA;S.costos.dEN=dEN;S.costos.dEV=dEV;
+  function calcCat(catE,pesoV,pesoE,ptro,pv,dR,dE){
+    let cR=0,cA=0,cE=0;
     S.dieta.ingredientes.forEach(ing=>{const pr=S.costos.precios[ing.n]||0;
-      cR+=pr*(ing.p.recria||0)/100*k.recria*dR;cE+=pr*(ing.p[catE]||0)/100*k[catE]*dE;});
-    const ci=ptro*1.1*pesoE,pvT=pv*pesoV,ct=ci+cR+cE,mg=pvT-ct,rt=pvT>0?mg/pvT*100:0;
+      cR+=pr*(ing.p.recria||0)/100*k.recria*dR;
+      cA+=pr*(ing.p.adapt||0)/100*k.adapt*dA;
+      cE+=pr*(ing.p[catE]||0)/100*k[catE]*dE;});
+  const pH=S.costos.precios['Hotelería']||0,cH=pH*(dR+dE),ci=ptro*1.1*pesoE,pvT=pv*pesoV*0.95,ct=ci+cR+cA+cE+cH,mg=pvT-ct,rt=pvT>0?mg/pvT*100:0;
     return`<table style="width:100%"><tbody>
-      <tr><td>Precio venta (${pesoV} kg)</td><td class="r" style="font-weight:600">$${f(pvT)}</td></tr>
-      <tr><td>Costo inicial ternero/a</td><td class="r">$${f(ci)}</td></tr>
+      <tr><td>Precio venta (${pesoV} kg, -5%)</td><td class="r" style="font-weight:600">$${f(pvT)}</td></tr>
+      <tr><td>Costo inicial ternero/a (+10%)</td><td class="r">$${f(ci)}</td></tr>
       <tr><td>Costo ración recría (${dR}d)</td><td class="r">$${f(cR)}</td></tr>
-      <tr><td>Costo ración engorde (${dE}d)</td><td class="r">$${f(cE)}</td></tr>
+      <tr><td>Costo ración adaptación (${dA}d)</td><td class="r">$${f(cA)}</td></tr>
+      <tr><td>Costo ración engorde (${dE}d)</td><td class="r">$${f(cE)}</td></tr><tr><td>Costo hotel.(ciclo)</td><td class="r">$${f(cH)}</td></tr>
       <tr style="border-top:2px solid #eee"><td style="font-weight:600">Costo total</td><td class="r" style="font-weight:600">$${f(ct)}</td></tr>
       <tr><td style="font-weight:700">Margen bruto</td><td class="r">
         <span style="font-size:20px;font-weight:700;color:${mg>=0?'#2d5016':'#8b1a1a'}">$${f(mg)}</span></td></tr>
@@ -1155,8 +1366,8 @@ function recalcC(){
     </tbody></table>`;
   }
   const nov=document.getElementById('c-nov');const vaq=document.getElementById('c-vaq');
-  if(nov)nov.innerHTML=calcCat('engnov',390,200,S.costos.ptro,S.costos.pvn);
-  if(vaq)vaq.innerHTML=calcCat('engvq',340,180,S.costos.ptra,S.costos.pvv);
+  if(nov)nov.innerHTML=calcCat('engnov',390,200,S.costos.ptro,S.costos.pvn,dRN,dEN);
+  if(vaq)vaq.innerHTML=calcCat('engvq',340,180,S.costos.ptra,S.costos.pvv,dRV,dEV);
 }
 
 // ── HISTORIAL ──
@@ -1184,11 +1395,17 @@ function renderHistorial(){
       </div>
       <div id="hd-${h.id}" class="hist-detail">
         <div class="g3" style="margin-top:12px">
-          <div><div class="cttl">Hacienda</div>
+          <div><div class="cttl">Hacienda por categoría</div>
             <table><thead><tr><th>Categoría</th><th class="r">Animales</th></tr></thead><tbody>
               ${[['Recría',t.recria],['Engorde VQ',t.engvq],['Engorde NOV',t.engnov],['Adaptación',t.adapt],['Total',t.total]]
                 .map(([l,v])=>`<tr><td>${l}</td><td class="r" style="${l==='Total'?'font-weight:700':''}">${f(v||0)}</td></tr>`).join('')}
-            </tbody></table></div>
+            </tbody></table>
+            ${h.hacFirmas?`<div class="cttl" style="margin-top:12px">Por firma</div>
+            <table><thead><tr><th>Firma</th><th class="r">Machos</th><th class="r">Hembras</th><th class="r">Total</th></tr></thead><tbody>
+              ${['FIVE','MVE','TABELA'].map(fn=>{const fw=h.hacFirmas[fn]||{};const tot=(fw.m||0)+(fw.h||0);
+                return tot>0?`<tr><td>${fn}</td><td class="r">${f(fw.m||0)}</td><td class="r">${f(fw.h||0)}</td><td class="r" style="font-weight:600">${f(tot)}</td></tr>`:''}).join('')}
+            </tbody></table>`:''}
+          </div>
           <div><div class="cttl">Granos y silo</div>
             <table><thead><tr><th>Tipo</th><th class="r">kg actuales</th></tr></thead><tbody>
               ${['Silo Maíz','Silo Cebada','Maíz grano','Soja','Trigo','Cebada'].map(tipo=>{
@@ -1260,7 +1477,6 @@ function registrarVenta(){
   const tropaName=(S.tropas||[]).find(t=>t.id===v.tropaId)?.origen||'';
   S.movimientos.unshift({id:uid(),tipo:'Venta '+v.firma,cantidad:cant,
     desc:`Corral ${corral} — ${v.firma} ${v.sexo}${v.dte?' DTE:'+v.dte:''}${tropaName?' ('+tropaName+')':''}`,fecha:v.fecha});
-  syncHacFromTropas();subtractVentasFromHacienda();
   save();renderVentasTabla();renderCorrDisp();renderHacTots();
   ['vt-peso','vt-precio','vt-dte','vt-destino'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('vt-cant').value='1';
@@ -1281,7 +1497,6 @@ function subtractVentasFromHacienda(){
 function delVenta(id){
   if(!confirm('¿Eliminar esta venta?'))return;
   S.ventas=S.ventas.filter(v=>v.id!==id);
-  syncHacFromTropas();subtractVentasFromHacienda();
   save();renderVentasTabla();renderCorrDisp();renderHacTots();
 }
 function renderVentasTabla(){
@@ -1369,6 +1584,46 @@ function syncHacFromTropas(){
     d.total=['five_m','five_h','mve_m','mve_h','tab_m','tab_h'].reduce((s,f)=>s+(d[f]||0),0);
     if(ft.cat&&!d.cat) d.cat=ft.cat;
   });
+  // Apply movimiento-based deaths (corral known, firma/sexo unknown)
+  // Build per-corral deaths WITH firma+sexo info from movimientos
+  const movDeathsDetailed={};
+  (S.movimientos||[]).forEach(function(m){
+    if(!(m.tipo&&m.tipo.startsWith('Muerte')&&m.corral&&m.cantidad>0))return;
+    const c=isNaN(m.corral)?m.corral:Number(m.corral);
+    if(!movDeathsDetailed[c])movDeathsDetailed[c]=[];
+    movDeathsDetailed[c].push({cant:Number(m.cantidad||0),firma:m.firma||'',sexo:m.sexo||''});
+  });
+  Object.keys(movDeathsDetailed).forEach(function(c){
+    const key=isNaN(c)?c:Number(c);
+    if(!S.hacienda.corrales[key])return;
+    const d=S.hacienda.corrales[key];
+    movDeathsDetailed[c].forEach(function(entry){
+      let rem=entry.cant;
+      if(entry.firma&&entry.sexo){
+        // Precise: deduct from the right field
+        let prefix='';
+        if(entry.firma==='FIVE')prefix='five';
+        else if(entry.firma==='MVE')prefix='mve';
+        else if(entry.firma==='TABELA')prefix='tab';
+        if(prefix){
+          const fld=prefix+(entry.sexo==='Machos'?'_m':'_h');
+          d[fld]=Math.max(0,(Number(d[fld])||0)-rem);
+          rem=0;
+        }
+      }
+      // Fallback: deduct from largest field
+      if(rem>0){
+        ['tab_m','tab_h','mve_m','mve_h','five_m','five_h'].forEach(function(fld){
+          if(rem<=0)return;
+          const cur=Number(d[fld])||0;
+          const sub=Math.min(cur,rem);
+          d[fld]=cur-sub;
+          rem-=sub;
+        });
+      }
+    });
+    d.total=['five_m','five_h','mve_m','mve_h','tab_m','tab_h'].reduce(function(s,fld){return s+(Number(d[fld])||0);},0);
+  });
 }
 
 // ── MUERTES ──
@@ -1388,7 +1643,6 @@ function registrarMuerte(){
   const cant=Number(document.getElementById('mu-cant').value)||0;
   if(!cant){alert('Ingresá la cantidad');return;}
   const corral=document.getElementById('mu-corral').value;
-  if(!corral){alert('Seleccioná el corral');return;}
   const m={
     id:uid(),
     fecha:document.getElementById('mu-fecha').value||hoy(),
@@ -1405,7 +1659,6 @@ function registrarMuerte(){
   // Also add to movimientos for hacienda record
   S.movimientos.unshift({id:uid(),tipo:'Muerte '+m.cat,cantidad:cant,
     desc:`Corral ${corral} — ${m.firma} ${m.sexo}${m.obs?' — '+m.obs:''}`,fecha:m.fecha});
-  syncHacFromTropas();
   save();
   renderMuertasTabla();
   renderCorrDisp();
@@ -1417,7 +1670,6 @@ function registrarMuerte(){
 function delMuerte(id){
   if(!confirm('¿Eliminar este registro?'))return;
   S.muertes=S.muertes.filter(m=>m.id!==id);
-  syncHacFromTropas();
   save();renderMuertasTabla();renderCorrDisp();renderHacTots();
 }
 
@@ -1426,10 +1678,10 @@ function renderMuertasTabla(){
   if(!S.muertes||!S.muertes.length){
     tb.innerHTML='<tr><td colspan="9" class="empty">Sin muertes registradas.</td></tr>';return;
   }
-  tb.innerHTML=[...S.muertes].sort((a,b)=>b.fecha>a.fecha?1:-1).map(m=>`<tr>
+  tb.innerHTML=[...S.muertes].sort((a,b)=>b.fecha>a.fecha?1:b.fecha<a.fecha?-1:0).map(m=>`<tr>
     <td>${m.fecha}</td>
     <td>${m.tropaId?(S.tropas||[]).find(t=>t.id===m.tropaId)?.origen||'—':'—'}</td>
-    <td>Corral ${m.corral}</td><td>${m.firma}</td><td>${m.sexo}</td><td>${m.cat}</td>
+    <td>${m.corral?'Corral '+m.corral:'<span style="color:#aaa">Sin designar</span>'}</td><td>${m.firma}</td><td>${m.sexo}</td><td>${m.cat}</td>
     <td class="r" style="font-weight:600;color:#8b1a1a">${m.cant}</td>
     <td>${m.obs||'—'}</td>
     <td><button class="btn btn-sm btn-d" onclick="delMuerte('${m.id}')">✕</button></td>
@@ -1541,9 +1793,8 @@ function guardarTropa(){
   } else {
     S.tropas.unshift({id:uid(),...t});
   }
-  syncHacFromTropas();
   save();renderTropasTabla();
-  alert('✓ Tropa guardada — Hacienda actualizada');
+  alert('✓ Tropa guardada. Recordá actualizar los corrales en Hacienda manualmente si corresponde.');
 }
 function delTropa(id){
   if(!confirm('¿Eliminar esta tropa?'))return;
@@ -1577,11 +1828,46 @@ function editTropa(id){
 }
 function renderTropas(){
   updTropaDefaults();renderTropasTabla();
-  document.getElementById('tr-fingreso').value=hoy();
-  document.getElementById('mu-fecha').value=hoy();
-  document.getElementById('vt-fecha').value=hoy();
+  const _sv=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v;};
+  _sv('tr-fingreso',hoy());_sv('mu-fecha',hoy());_sv('vt-fecha',hoy());_sv('lv-fecha',hoy());
   populateTropaSelect();populateVentaSelect();
-  renderMuertasTabla();renderVentasTabla();
+  renderMuertasTabla();renderVentasTabla();renderLotesVentaTabla();
+}
+// ── LOTES DE VENTA (planilla simple) ──
+function registrarLoteVenta(){
+  const cant=Number(document.getElementById('lv-cant').value)||0;
+  const numero=document.getElementById('lv-numero').value.trim();
+  if(!numero){alert('Ingresá el N° de lote');return;}
+  if(!cant){alert('Ingresá la cantidad');return;}
+  const lv={id:uid(),numero,fecha:document.getElementById('lv-fecha').value||hoy(),
+    firma:document.getElementById('lv-firma').value,
+    sexo:document.getElementById('lv-sexo').value,
+    cant,peso:Number(document.getElementById('lv-peso').value)||0,
+    destino:document.getElementById('lv-destino').value||'',
+    obs:document.getElementById('lv-obs').value||''};
+  if(!S.lotesVenta)S.lotesVenta=[];
+  S.lotesVenta.unshift(lv);
+  save();renderLotesVentaTabla();
+  ['lv-numero','lv-cant','lv-peso','lv-destino','lv-obs'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('lv-fecha').value=hoy();
+}
+function delLoteVenta(id){
+  if(!confirm('¿Eliminar este lote?'))return;
+  S.lotesVenta=(S.lotesVenta||[]).filter(l=>l.id!==id);
+  save();renderLotesVentaTabla();
+}
+function renderLotesVentaTabla(){
+  const tb=document.getElementById('lv-tabla');if(!tb)return;
+  if(!S.lotesVenta||!S.lotesVenta.length){
+    tb.innerHTML='<tr><td colspan="9" class="empty">Sin lotes registrados.</td></tr>';return;
+  }
+  const sorted=[...S.lotesVenta].sort((a,b)=>b.fecha>a.fecha?1:-1);
+  tb.innerHTML=sorted.map(l=>`<tr><td>${l.numero}</td><td>${l.fecha}</td>
+    <td>${l.firma||'—'}</td><td>${l.sexo||'—'}</td>
+    <td class="r" style="font-weight:600">${f(l.cant)}</td>
+    <td class="r">${l.peso?f(l.peso)+' kg':'—'}</td>
+    <td>${l.destino||'—'}</td><td>${l.obs||'—'}</td>
+    <td><button class="btn btn-sm btn-d" onclick="delLoteVenta('${l.id}')">✕</button></td></tr>`).join('');
 }
 function fechaEnRango(fechaStr, mesInicio, mesFin){
   if(!fechaStr||fechaStr==='—')return false;
@@ -1634,115 +1920,261 @@ function renderTropasTabla(){
   </tr>`;}).join('');
 }
 
-// ── EXPORTAR EXCEL (CSV acumulado) ──
+// ── EXPORTAR EXCEL ──
 function exportarExcel(){
-  const rows=[];
-  // Header
-  rows.push(['FECHA','MODULO','CAMPO','VALOR']);
-  // Current week
-  const fecha=S.semana.fecha;
-  S.granos.forEach(g=>{
-    rows.push([fecha,'Granos','Tipo',g.tipo]);
-    rows.push([fecha,'Granos','Bolsa',g.bolsa]);
-    rows.push([fecha,'Granos','Cosecha',g.cosecha]);
-    rows.push([fecha,'Granos','Kg actual',g.kgActual||0]);
-    rows.push([fecha,'Granos','Metros actuales',g.metrosActuales||0]);
-  });
-  const t=getHacTots();
-  rows.push([fecha,'Hacienda','Total animales',t.total]);
-  rows.push([fecha,'Hacienda','Recría',t.recria]);
-  rows.push([fecha,'Hacienda','Engorde VQ',t.engvq]);
-  rows.push([fecha,'Hacienda','Engorde NOV',t.engnov]);
-
-  // Historial acumulado
-  rows.push(['','','','']);
-  rows.push(['--- HISTORIAL ACUMULADO ---','','','']);
-  rows.push(['FECHA','TOTAL ANIMALES','RECRÍA','ENGORDE VQ','ENGORDE NOV','KG GRANOS TOTAL','NOTAS']);
-  S.historial.forEach(h=>{
-    const tt=h.hacTots||{};
-    const kg=(h.granos||[]).reduce((s,g)=>s+Number(g.kgActual||0),0);
-    rows.push([h.fecha,tt.total||0,tt.recria||0,tt.engvq||0,tt.engnov||0,kg,h.notas||'']);
-  });
-
-  // Hacienda detalle por semana
-  rows.push(['','','','']);
-  rows.push(['--- HACIENDA DETALLE POR SEMANA ---','','','','','','']);
-  rows.push(['FECHA','CORRAL','CATEGORÍA','TOTAL','FIVE M','FIVE H','MVE M','MVE H','TAB M','TAB H']);
-  S.historial.forEach(h=>{
-    CORRALES.forEach(c=>{
-      const d=(h.hacienda&&h.hacienda.corrales&&h.hacienda.corrales[c])||{};
-      if(d.total>0)rows.push([h.fecha,`Corral ${c}`,d.cat||'',d.total||0,d.five_m||0,d.five_h||0,d.mve_m||0,d.mve_h||0,d.tab_m||0,d.tab_h||0]);
-    });
-  });
-
-  // Granos detalle por semana
-  rows.push(['','','','']);
-  rows.push(['--- GRANOS DETALLE POR SEMANA ---','','','','']);
-  rows.push(['FECHA','TIPO','BOLSA','COSECHA','LOTE','KG ACTUAL','METROS ACTUALES']);
-  S.historial.forEach(h=>{
-    (h.granos||[]).forEach(g=>{
-      rows.push([h.fecha,g.tipo,g.bolsa,g.cosecha,g.lote||'',g.kgActual||0,g.metrosActuales||0]);
-    });
-  });
-
-  const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download=`LaFe_historial_${hoy()}.csv`;a.click();
-}
-
-// ── INIT ──
-async function init(){
-  // Show loading
-  document.querySelector('main').innerHTML = '<div style="text-align:center;padding:60px;color:#888"><div style="font-size:32px;margin-bottom:12px">🌾</div><div>Cargando datos...</div></div>';
-
-  // Try cloud first, fallback to local
-  const fromCloud = await loadFromCloud();
-  if(!fromCloud) load();
-
-  // Rebuild main content
-  location.reload(); // simplest way to re-render after async load
-}
-
-// If readonly mode, apply restrictions after DOM loads
-if(IS_READONLY){
-  document.addEventListener('DOMContentLoaded', ()=>{
-    // Hide edit buttons in nav, show refresh
-    document.querySelectorAll('.ebtn').forEach(el=>{
-      if(el.textContent.includes('Guardar') || el.textContent.includes('Exportar'))
-        el.style.display='none';
-    });
-    const rb=document.getElementById('btn-refresh');
-    if(rb)rb.style.display='';
-    // Add readonly banner
-    const banner=document.createElement('div');
-    banner.style.cssText='background:#fff8dc;border-bottom:2px solid #c8961e;padding:8px 20px;font-size:12px;color:#7a6010;text-align:center;font-weight:600;';
-    banner.innerHTML='👁 Modo solo lectura — datos actualizados desde La Fé &nbsp;|&nbsp; <a href="?modo=lectura" onclick="refreshData();return false;" style="color:#7a6010">🔄 Actualizar datos</a>';
-    document.body.insertBefore(banner, document.querySelector('nav').nextSibling);
-    // Disable all inputs and buttons inside main
-    setTimeout(()=>{
-      document.querySelectorAll('main input, main select, main textarea, main button').forEach(el=>{
-        el.disabled=true;el.style.pointerEvents='none';el.style.opacity='.6';
-      });
-    }, 500);
-  });
-}
-
-load();
-CORRALES.forEach(c=>{if(!S.hacienda.corrales[c])S.hacienda.corrales[c]={cat:'',total:0,five_m:0,five_h:0,mve_m:0,mve_h:0,tab_m:0,tab_h:0};});
-document.getElementById('dash-fecha').value=S.semana.fecha;
-['mv-fec','al-fec','g-fec'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=hoy();});
-
-// Load from cloud in background and refresh if newer data found
-loadFromCloud().then(found=>{
-  if(found){
-    CORRALES.forEach(c=>{if(!S.hacienda.corrales[c])S.hacienda.corrales[c]={cat:'',total:0,five_m:0,five_h:0,mve_m:0,mve_h:0,tab_m:0,tab_h:0};});
-    document.getElementById('dash-fecha').value=S.semana.fecha;
-    renderDash();
+  if(typeof XLSX==='undefined'){
+    alert('Cargando librería... esperá 3 segundos y volvé a intentar.');
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=function(){ console.log('XLSX cargado OK'); _doExport(); };
+    s.onerror=function(){ alert('Error cargando librería Excel. Revisá tu conexión a internet.'); };
+    document.head.appendChild(s);
+    return;
   }
-});
+  console.log('XLSX ya cargado, exportando...');
+  _doExport();
+}
+function _doExport(){
+  try{
+  console.log('_doExport iniciado');
+  const wb=XLSX.utils.book_new();
+  const gr=[['Tipo','Cosecha','Bolsa','Lote','Ubicación','Kg cosecha inicial','Metros iniciales','Metros actuales','Kg actuales','Fecha']];
+  S.granos.forEach(g=>gr.push([g.tipo,g.cosecha,g.bolsa,g.lote||'',g.ubicacion||'',g.kgInicial||0,g.metrosIniciales||0,g.metrosActuales||0,g.kgActual||0,g.fecha||'']));
+  gr.push([]);gr.push(['TOTALES POR TIPO','','','','','','','','Kg actuales','']);
+  [...new Set(S.granos.map(g=>g.tipo))].forEach(tipo=>{
+    const tot=S.granos.filter(g=>g.tipo===tipo).reduce((s,g)=>s+Number(g.kgActual||0),0);
+    gr.push([tipo,'','','','','','','',tot,'']);
+  });
+  const ws1=XLSX.utils.aoa_to_sheet(gr);
+  ws1['!cols']=[{wch:14},{wch:8},{wch:12},{wch:14},{wch:14},{wch:14},{wch:12},{wch:12},{wch:12},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws1,'Granos y silo');
+  const hac=[['Corral','Categoría','Total','FIVE M','FIVE H','MVE M','MVE H','TAB M','TAB H','Peso est.','Fecha salida','1er salida tropas']];
+  CORRALES.forEach(c=>{const d=S.hacienda.corrales[c]||{};
+    hac.push([`Corral ${c}`,d.cat||'',d.total||0,d.five_m||0,d.five_h||0,d.mve_m||0,d.mve_h||0,d.tab_m||0,d.tab_h||0,d.pesoEst||'',d.fechaSalida||'',getEarliestSalida(c)||'']);});
+  const t=getHacTots();hac.push([]);
+  hac.push(['Recría','',t.recria]);hac.push(['Engorde VQ','',t.engvq]);hac.push(['Engorde NOV','',t.engnov]);hac.push(['Total','',t.total]);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(hac),'Hacienda');
+  if(S.tropas&&S.tropas.length){
+    const tr=[['Firma','Origen','Corral','Sexo','F. Ingreso','Cantidad','Peso inicial','F. Inicio Adapt.','Esc.1 Peso','Esc.1 Salida','Esc.1 Días','Esc.2 Peso','Esc.2 Salida','Esc.2 Días']];
+    [...S.tropas].sort((a,b)=>b.fingreso>a.fingreso?1:-1).forEach(t=>
+      tr.push([t.firma,t.origen||'',t.corral||'',t.sexo,t.fingreso||'',t.cant||0,t.pesoIni||0,t.fechaAdp||'',t.pv1||0,t.fsal1||'',t.dtot1||0,t.pv2||0,t.fsal2||'',t.dtot2||0]));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(tr),'Tropas');
+  }
+  if(S.muertes&&S.muertes.length){
+    const mu=[['Fecha','Tropa','Corral','Firma','Sexo','Categoría','Cantidad','Observación']];
+    [...S.muertes].sort((a,b)=>b.fecha>a.fecha?1:-1).forEach(m=>{
+      const tn=(S.tropas||[]).find(t=>t.id===m.tropaId)?.origen||'—';
+      mu.push([m.fecha,tn,`Corral ${m.corral}`,m.firma,m.sexo,m.cat,m.cant,m.obs||'']);});
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(mu),'Muertes');
+  }
+  if(S.ventas&&S.ventas.length){
+    const vt=[['Fecha','Tropa','Corral','Firma','Sexo','Cantidad','Peso prom (kg)','Precio ($/kg)','Total ($)','N° DTE','Destino']];
+    [...S.ventas].sort((a,b)=>b.fecha>a.fecha?1:-1).forEach(v=>{
+      const tn=(S.tropas||[]).find(t=>t.id===v.tropaId)?.origen||'—';
+      vt.push([v.fecha,tn,`Corral ${v.corral}`,v.firma,v.sexo,v.cant,v.peso||0,v.precio||0,v.total||0,v.dte||'',v.destino||'']);});
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(vt),'Ventas');
+  }
+  if(S.movimientos&&S.movimientos.length){
+    const mv=[['Fecha','Tipo','Cantidad','Descripción']];
+    S.movimientos.slice(0,500).forEach(m=>mv.push([m.fecha,m.tipo,m.cantidad,m.desc||'']));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(mv),'Movimientos');
+  }
+  if(S.historial&&S.historial.length){
+    const hs=[['Fecha','Total animales','Recría','Engorde VQ','Engorde NOV','Adaptación','Kg granos total','Notas']];
+    S.historial.forEach(h=>{const tt=h.hacTots||{};
+      const kg=(h.granos||[]).reduce((s,g)=>s+Number(g.kgActual||0),0);
+      hs.push([h.fecha,tt.total||0,tt.recria||0,tt.engvq||0,tt.engnov||0,tt.adapt||0,kg,h.notas||'']);});
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(hs),'Historial resumen');
+    const hg=[['Fecha','Tipo','Bolsa','Cosecha','Lote','Kg actuales','Metros actuales']];
+    S.historial.forEach(h=>(h.granos||[]).forEach(g=>
+      hg.push([h.fecha,g.tipo,g.bolsa,g.cosecha,g.lote||'',g.kgActual||0,g.metrosActuales||0])));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(hg),'Historial granos');
+    const hh=[['Fecha','Corral','Categoría','Total','FIVE M','FIVE H','MVE M','MVE H','TAB M','TAB H']];
+    S.historial.forEach(h=>CORRALES.forEach(c=>{
+      const d=(h.hacienda&&h.hacienda.corrales&&h.hacienda.corrales[c])||{};
+      if(d.total>0)hh.push([h.fecha,`Corral ${c}`,d.cat||'',d.total||0,d.five_m||0,d.five_h||0,d.mve_m||0,d.mve_h||0,d.tab_m||0,d.tab_h||0]);
+    }));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(hh),'Historial hacienda');
+  }
+  XLSX.writeFile(wb,`LaFe_${hoy()}.xlsx`);
+  console.log('Export completado');
+  }catch(e){ console.error('Export error:', e); alert('Error al exportar: '+e.message); }
+}
 
-renderDash();
+
+// ── PRELOADED DATA ──
+const PRELOADED_STATE = {"semana": {"fecha": "2026-05-26", "notas": ""}, "granos": [{"id": "pre0001", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "1", "lote": "5a/8", "ubicacion": "", "kgInicial": 227570, "metrosIniciales": 69, "metrosActuales": 53.0, "kgActual": 174800, "kgTeorico": 174800, "fecha": "2026-05-26"}, {"id": "pre0002", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "2", "lote": "8", "ubicacion": "", "kgInicial": 223550, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 223550, "kgTeorico": 223550, "fecha": "2026-05-26"}, {"id": "pre0003", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "3", "lote": "8", "ubicacion": "", "kgInicial": 229900, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 229900, "kgTeorico": 229900, "fecha": "2026-05-26"}, {"id": "pre0004", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "4", "lote": "8", "ubicacion": "", "kgInicial": 210500, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 210500, "kgTeorico": 210500, "fecha": "2026-05-26"}, {"id": "pre0005", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "5", "lote": "8", "ubicacion": "", "kgInicial": 223200, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 223200, "kgTeorico": 223200, "fecha": "2026-05-26"}, {"id": "pre0006", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "6", "lote": "8", "ubicacion": "", "kgInicial": 211200, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 211200, "kgTeorico": 211200, "fecha": "2026-05-26"}, {"id": "pre0007", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "7", "lote": "10a", "ubicacion": "", "kgInicial": 221600, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 221600, "kgTeorico": 221600, "fecha": "2026-05-26"}, {"id": "pre0008", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "8", "lote": "10a", "ubicacion": "", "kgInicial": 227800, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 227800, "kgTeorico": 227800, "fecha": "2026-05-26"}, {"id": "pre0009", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "9", "lote": "10a", "ubicacion": "", "kgInicial": 237200, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 237200, "kgTeorico": 237200, "fecha": "2026-05-26"}, {"id": "pre0010", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "10", "lote": "10a", "ubicacion": "", "kgInicial": 233700, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 233700, "kgTeorico": 233700, "fecha": "2026-05-26"}, {"id": "pre0011", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "11", "lote": "10a", "ubicacion": "", "kgInicial": 229200, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 229200, "kgTeorico": 229200, "fecha": "2026-05-26"}, {"id": "pre0012", "tipo": "Maíz grano", "cosecha": "2025", "bolsa": "5", "lote": "9", "ubicacion": "", "kgInicial": 248100, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 248100, "kgTeorico": 248100, "fecha": "2026-05-26"}, {"id": "pre0013", "tipo": "Maíz grano", "cosecha": "2025", "bolsa": "10", "lote": "2b/11b/14b", "ubicacion": "", "kgInicial": 253644, "metrosIniciales": 69, "metrosActuales": 50.0, "kgActual": 183800, "kgTeorico": 183800, "fecha": "2026-05-26"}, {"id": "pre0014", "tipo": "Maíz grano", "cosecha": "2024", "bolsa": "4", "lote": "16", "ubicacion": "", "kgInicial": 224100, "metrosIniciales": 69, "metrosActuales": 41.8, "kgActual": 135759, "kgTeorico": 135759, "fecha": "2026-05-26"}, {"id": "pre0015", "tipo": "Silo Cebada", "cosecha": "2025", "bolsa": "1", "lote": "3b", "ubicacion": "", "kgInicial": 368460, "metrosIniciales": 90, "metrosActuales": 38.0, "kgActual": 155572, "kgTeorico": 155572, "fecha": "2026-05-26"}, {"id": "pre0016", "tipo": "Silo Cebada", "cosecha": "2025", "bolsa": "2", "lote": "6b", "ubicacion": "", "kgInicial": 373120, "metrosIniciales": 90, "metrosActuales": 90.0, "kgActual": 373120, "kgTeorico": 373120, "fecha": "2026-05-26"}, {"id": "pre0017", "tipo": "Silo Cebada", "cosecha": "2025", "bolsa": "3", "lote": "5b", "ubicacion": "", "kgInicial": 376640, "metrosIniciales": 90, "metrosActuales": 90.0, "kgActual": 376640, "kgTeorico": 376640, "fecha": "2026-05-26"}, {"id": "pre0018", "tipo": "Soja", "cosecha": "2024", "bolsa": "7", "lote": "1", "ubicacion": "", "kgInicial": 241698, "metrosIniciales": 69, "metrosActuales": 1.4274, "kgActual": 5000, "kgTeorico": 5000, "fecha": "2026-05-26"}, {"id": "pre0019", "tipo": "Soja", "cosecha": "2026", "bolsa": "1", "lote": "9", "ubicacion": "", "kgInicial": 230100, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 230100, "kgTeorico": 230100, "fecha": "2026-05-26"}, {"id": "pre0020", "tipo": "Soja", "cosecha": "2026", "bolsa": "2", "lote": "9", "ubicacion": "", "kgInicial": 230380, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 230380, "kgTeorico": 230380, "fecha": "2026-05-26"}, {"id": "pre0021", "tipo": "Soja", "cosecha": "2026", "bolsa": "3", "lote": "9/4", "ubicacion": "", "kgInicial": 236510, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 236510, "kgTeorico": 236510, "fecha": "2026-05-26"}, {"id": "pre0022", "tipo": "Soja", "cosecha": "2026", "bolsa": "4", "lote": "4", "ubicacion": "", "kgInicial": 234530, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 234530, "kgTeorico": 234530, "fecha": "2026-05-26"}, {"id": "pre0023", "tipo": "Soja", "cosecha": "2026", "bolsa": "5", "lote": "1s/1n/7a", "ubicacion": "", "kgInicial": 234250, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 234250, "kgTeorico": 234250, "fecha": "2026-05-26"}, {"id": "pre0024", "tipo": "Soja", "cosecha": "2026", "bolsa": "6", "lote": "7b", "ubicacion": "", "kgInicial": 220500, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 220500, "kgTeorico": 220500, "fecha": "2026-05-26"}, {"id": "pre0025", "tipo": "Soja", "cosecha": "2026", "bolsa": "7", "lote": "7b", "ubicacion": "", "kgInicial": 220000, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 220000, "kgTeorico": 220000, "fecha": "2026-05-26"}, {"id": "pre0026", "tipo": "Soja", "cosecha": "2026", "bolsa": "8", "lote": "12", "ubicacion": "", "kgInicial": 220300, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 220300, "kgTeorico": 220300, "fecha": "2026-05-26"}, {"id": "pre0027", "tipo": "Soja", "cosecha": "2026", "bolsa": "9", "lote": "12/15n", "ubicacion": "", "kgInicial": 221800, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 221800, "kgTeorico": 221800, "fecha": "2026-05-26"}, {"id": "pre0028", "tipo": "Soja", "cosecha": "2026", "bolsa": "10", "lote": "12/15n", "ubicacion": "", "kgInicial": 224600, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 224600, "kgTeorico": 224600, "fecha": "2026-05-26"}, {"id": "pre0029", "tipo": "Soja", "cosecha": "2026", "bolsa": "11", "lote": "13a", "ubicacion": "", "kgInicial": 211900, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 211900, "kgTeorico": 211900, "fecha": "2026-05-26"}, {"id": "pre0030", "tipo": "Soja", "cosecha": "2026", "bolsa": "12", "lote": "3a", "ubicacion": "", "kgInicial": 291633, "metrosIniciales": 69, "metrosActuales": 32.0, "kgActual": 135250, "kgTeorico": 135250, "fecha": "2026-05-26"}, {"id": "pre0031", "tipo": "Soja", "cosecha": "2026", "bolsa": "13", "lote": "11a", "ubicacion": "", "kgInicial": 234993, "metrosIniciales": 69, "metrosActuales": 61.5, "kgActual": 209450, "kgTeorico": 209450, "fecha": "2026-05-26"}, {"id": "pre0032", "tipo": "Soja", "cosecha": "2026", "bolsa": "14", "lote": "15s/11a", "ubicacion": "", "kgInicial": 229700, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 229700, "kgTeorico": 229700, "fecha": "2026-05-26"}, {"id": "pre0033", "tipo": "Soja", "cosecha": "2026", "bolsa": "15", "lote": "18", "ubicacion": "", "kgInicial": 225160, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 225160, "kgTeorico": 225160, "fecha": "2026-05-26"}, {"id": "pre0034", "tipo": "Soja", "cosecha": "2026", "bolsa": "16", "lote": "18/17a", "ubicacion": "", "kgInicial": 233114, "metrosIniciales": 69, "metrosActuales": 65.0, "kgActual": 219600, "kgTeorico": 219600, "fecha": "2026-05-26"}, {"id": "pre0035", "tipo": "Soja", "cosecha": "2026", "bolsa": "17", "lote": "17a/17b/18", "ubicacion": "", "kgInicial": 224388, "metrosIniciales": 69, "metrosActuales": 65.0, "kgActual": 211380, "kgTeorico": 211380, "fecha": "2026-05-26"}, {"id": "pre0036", "tipo": "Soja", "cosecha": "2026", "bolsa": "18", "lote": "16", "ubicacion": "", "kgInicial": 227275, "metrosIniciales": 69, "metrosActuales": 65.0, "kgActual": 214100, "kgTeorico": 214100, "fecha": "2026-05-26"}, {"id": "pre0037", "tipo": "Soja", "cosecha": "2026", "bolsa": "19", "lote": "7b/10b", "ubicacion": "", "kgInicial": 225917, "metrosIniciales": 69, "metrosActuales": 65.0, "kgActual": 212820, "kgTeorico": 212820, "fecha": "2026-05-26"}, {"id": "pre0038", "tipo": "Soja", "cosecha": "2026", "bolsa": "20", "lote": "12/7b/9", "ubicacion": "", "kgInicial": 230596, "metrosIniciales": 69, "metrosActuales": 66.0, "kgActual": 220570, "kgTeorico": 220570, "fecha": "2026-05-26"}, {"id": "pre0039", "tipo": "Soja", "cosecha": "2026", "bolsa": "21", "lote": "12/7b/9", "ubicacion": "", "kgInicial": 237774, "metrosIniciales": 69, "metrosActuales": 25.0, "kgActual": 86150, "kgTeorico": 86150, "fecha": "2026-05-26"}, {"id": "pre0040", "tipo": "Soja", "cosecha": "2026", "bolsa": "22", "lote": "3a/6a", "ubicacion": "", "kgInicial": 241356, "metrosIniciales": 69, "metrosActuales": 24.0, "kgActual": 83950, "kgTeorico": 83950, "fecha": "2026-05-26"}, {"id": "pre0041", "tipo": "Soja", "cosecha": "2026", "bolsa": "23", "lote": "3a", "ubicacion": "", "kgInicial": 263580, "metrosIniciales": 69, "metrosActuales": 5.0, "kgActual": 19100, "kgTeorico": 19100, "fecha": "2026-05-26"}], "hacienda": {"fecha": "2026-05-26", "corrales": {"1": {"cat": "Recría", "total": 180, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 0, "tab_m": 0, "tab_h": 180}, "2": {"cat": "Engorde NOV", "total": 130, "five_m": 24, "five_h": 0, "mve_m": 53, "mve_h": 0, "tab_m": 53, "tab_h": 0}, "3": {"cat": "Recría", "total": 65, "five_m": 0, "five_h": 65, "mve_m": 0, "mve_h": 0, "tab_m": 0, "tab_h": 0}, "4": {"cat": "Recría", "total": 81, "five_m": 0, "five_h": 0, "mve_m": 81, "mve_h": 0, "tab_m": 0, "tab_h": 0}, "5": {"cat": "Recría", "total": 136, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 0, "tab_m": 136, "tab_h": 0}, "6": {"cat": "Engorde VQ", "total": 151, "five_m": 0, "five_h": 129, "mve_m": 0, "mve_h": 18, "tab_m": 0, "tab_h": 4}, "7": {"cat": "Recría", "total": 68, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 0, "tab_m": 0, "tab_h": 68}, "8": {"cat": "Recría", "total": 136, "five_m": 32, "five_h": 46, "mve_m": 0, "mve_h": 0, "tab_m": 33, "tab_h": 25}, "9": {"cat": "Engorde VQ", "total": 63, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 63, "tab_m": 0, "tab_h": 0}, "10": {"cat": "Recría", "total": 80, "five_m": 80, "five_h": 0, "mve_m": 0, "mve_h": 0, "tab_m": 0, "tab_h": 0}, "11": {"cat": "", "total": 0, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 0, "tab_m": 0, "tab_h": 0}, "12": {"cat": "Recría", "total": 148, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 0, "tab_m": 148, "tab_h": 0}, "Manga": {"cat": "Engorde VQ", "total": 55, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 55, "tab_m": 0, "tab_h": 0}}, "corralesPrev": {}}, "movimientos": [], "alimentos": [], "dieta": {"kgan": {"recria": 11, "engvq": 12.5, "engnov": 13, "adapt": 10}, "ingredientes": [{"n": "Pellet de Gs", "p": {"recria": 12, "engvq": 9, "engnov": 9, "adapt": 9}}, {"n": "Silo Cebada", "p": {"recria": 77.5, "engvq": 25, "engnov": 25, "adapt": 30}}, {"n": "Silo Maíz", "p": {"recria": 0, "engvq": 0, "engnov": 0, "adapt": 0}}, {"n": "Maíz grano", "p": {"recria": 9, "engvq": 63.7, "engnov": 63.7, "adapt": 50}}, {"n": "Cebada", "p": {"recria": 0, "engvq": 0, "engnov": 0, "adapt": 0}}, {"n": "Expeller Soja", "p": {"recria": 0, "engvq": 0, "engnov": 0, "adapt": 0}}, {"n": "Núcleo Terneros", "p": {"recria": 1, "engvq": 0, "engnov": 0, "adapt": 1}}, {"n": "Núcleo FSU", "p": {"recria": 0, "engvq": 1.5, "engnov": 1.5, "adapt": 0}}, {"n": "Urea", "p": {"recria": 0.5, "engvq": 0.8, "engnov": 0.8, "adapt": 0.5}}, {"n": "Hotelería", "p": {"recria": 0, "engvq": 0, "engnov": 0, "adapt": 9.5}}]}, "costos": {"dolar": 1394, "ptro": 6000, "ptra": 5700, "pvn": 5000, "pvv": 4700, "precios": {}}, "historial": [{"id": "hist001", "fecha": "2026-05-26", "label": "Semana 2026-05-26", "notas": "", "granos": [{"id": "pre0001", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "1", "lote": "5a/8", "ubicacion": "", "kgInicial": 227570, "metrosIniciales": 69, "metrosActuales": 53.0, "kgActual": 174800, "kgTeorico": 174800, "fecha": "2026-05-26"}, {"id": "pre0002", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "2", "lote": "8", "ubicacion": "", "kgInicial": 223550, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 223550, "kgTeorico": 223550, "fecha": "2026-05-26"}, {"id": "pre0003", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "3", "lote": "8", "ubicacion": "", "kgInicial": 229900, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 229900, "kgTeorico": 229900, "fecha": "2026-05-26"}, {"id": "pre0004", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "4", "lote": "8", "ubicacion": "", "kgInicial": 210500, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 210500, "kgTeorico": 210500, "fecha": "2026-05-26"}, {"id": "pre0005", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "5", "lote": "8", "ubicacion": "", "kgInicial": 223200, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 223200, "kgTeorico": 223200, "fecha": "2026-05-26"}, {"id": "pre0006", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "6", "lote": "8", "ubicacion": "", "kgInicial": 211200, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 211200, "kgTeorico": 211200, "fecha": "2026-05-26"}, {"id": "pre0007", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "7", "lote": "10a", "ubicacion": "", "kgInicial": 221600, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 221600, "kgTeorico": 221600, "fecha": "2026-05-26"}, {"id": "pre0008", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "8", "lote": "10a", "ubicacion": "", "kgInicial": 227800, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 227800, "kgTeorico": 227800, "fecha": "2026-05-26"}, {"id": "pre0009", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "9", "lote": "10a", "ubicacion": "", "kgInicial": 237200, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 237200, "kgTeorico": 237200, "fecha": "2026-05-26"}, {"id": "pre0010", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "10", "lote": "10a", "ubicacion": "", "kgInicial": 233700, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 233700, "kgTeorico": 233700, "fecha": "2026-05-26"}, {"id": "pre0011", "tipo": "Maíz grano", "cosecha": "2026", "bolsa": "11", "lote": "10a", "ubicacion": "", "kgInicial": 229200, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 229200, "kgTeorico": 229200, "fecha": "2026-05-26"}, {"id": "pre0012", "tipo": "Maíz grano", "cosecha": "2025", "bolsa": "5", "lote": "9", "ubicacion": "", "kgInicial": 248100, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 248100, "kgTeorico": 248100, "fecha": "2026-05-26"}, {"id": "pre0013", "tipo": "Maíz grano", "cosecha": "2025", "bolsa": "10", "lote": "2b/11b/14b", "ubicacion": "", "kgInicial": 253644, "metrosIniciales": 69, "metrosActuales": 50.0, "kgActual": 183800, "kgTeorico": 183800, "fecha": "2026-05-26"}, {"id": "pre0014", "tipo": "Maíz grano", "cosecha": "2024", "bolsa": "4", "lote": "16", "ubicacion": "", "kgInicial": 224100, "metrosIniciales": 69, "metrosActuales": 41.8, "kgActual": 135759, "kgTeorico": 135759, "fecha": "2026-05-26"}, {"id": "pre0015", "tipo": "Silo Cebada", "cosecha": "2025", "bolsa": "1", "lote": "3b", "ubicacion": "", "kgInicial": 368460, "metrosIniciales": 90, "metrosActuales": 38.0, "kgActual": 155572, "kgTeorico": 155572, "fecha": "2026-05-26"}, {"id": "pre0016", "tipo": "Silo Cebada", "cosecha": "2025", "bolsa": "2", "lote": "6b", "ubicacion": "", "kgInicial": 373120, "metrosIniciales": 90, "metrosActuales": 90.0, "kgActual": 373120, "kgTeorico": 373120, "fecha": "2026-05-26"}, {"id": "pre0017", "tipo": "Silo Cebada", "cosecha": "2025", "bolsa": "3", "lote": "5b", "ubicacion": "", "kgInicial": 376640, "metrosIniciales": 90, "metrosActuales": 90.0, "kgActual": 376640, "kgTeorico": 376640, "fecha": "2026-05-26"}, {"id": "pre0018", "tipo": "Soja", "cosecha": "2024", "bolsa": "7", "lote": "1", "ubicacion": "", "kgInicial": 241698, "metrosIniciales": 69, "metrosActuales": 1.4274, "kgActual": 5000, "kgTeorico": 5000, "fecha": "2026-05-26"}, {"id": "pre0019", "tipo": "Soja", "cosecha": "2026", "bolsa": "1", "lote": "9", "ubicacion": "", "kgInicial": 230100, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 230100, "kgTeorico": 230100, "fecha": "2026-05-26"}, {"id": "pre0020", "tipo": "Soja", "cosecha": "2026", "bolsa": "2", "lote": "9", "ubicacion": "", "kgInicial": 230380, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 230380, "kgTeorico": 230380, "fecha": "2026-05-26"}, {"id": "pre0021", "tipo": "Soja", "cosecha": "2026", "bolsa": "3", "lote": "9/4", "ubicacion": "", "kgInicial": 236510, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 236510, "kgTeorico": 236510, "fecha": "2026-05-26"}, {"id": "pre0022", "tipo": "Soja", "cosecha": "2026", "bolsa": "4", "lote": "4", "ubicacion": "", "kgInicial": 234530, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 234530, "kgTeorico": 234530, "fecha": "2026-05-26"}, {"id": "pre0023", "tipo": "Soja", "cosecha": "2026", "bolsa": "5", "lote": "1s/1n/7a", "ubicacion": "", "kgInicial": 234250, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 234250, "kgTeorico": 234250, "fecha": "2026-05-26"}, {"id": "pre0024", "tipo": "Soja", "cosecha": "2026", "bolsa": "6", "lote": "7b", "ubicacion": "", "kgInicial": 220500, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 220500, "kgTeorico": 220500, "fecha": "2026-05-26"}, {"id": "pre0025", "tipo": "Soja", "cosecha": "2026", "bolsa": "7", "lote": "7b", "ubicacion": "", "kgInicial": 220000, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 220000, "kgTeorico": 220000, "fecha": "2026-05-26"}, {"id": "pre0026", "tipo": "Soja", "cosecha": "2026", "bolsa": "8", "lote": "12", "ubicacion": "", "kgInicial": 220300, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 220300, "kgTeorico": 220300, "fecha": "2026-05-26"}, {"id": "pre0027", "tipo": "Soja", "cosecha": "2026", "bolsa": "9", "lote": "12/15n", "ubicacion": "", "kgInicial": 221800, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 221800, "kgTeorico": 221800, "fecha": "2026-05-26"}, {"id": "pre0028", "tipo": "Soja", "cosecha": "2026", "bolsa": "10", "lote": "12/15n", "ubicacion": "", "kgInicial": 224600, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 224600, "kgTeorico": 224600, "fecha": "2026-05-26"}, {"id": "pre0029", "tipo": "Soja", "cosecha": "2026", "bolsa": "11", "lote": "13a", "ubicacion": "", "kgInicial": 211900, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 211900, "kgTeorico": 211900, "fecha": "2026-05-26"}, {"id": "pre0030", "tipo": "Soja", "cosecha": "2026", "bolsa": "12", "lote": "3a", "ubicacion": "", "kgInicial": 291633, "metrosIniciales": 69, "metrosActuales": 32.0, "kgActual": 135250, "kgTeorico": 135250, "fecha": "2026-05-26"}, {"id": "pre0031", "tipo": "Soja", "cosecha": "2026", "bolsa": "13", "lote": "11a", "ubicacion": "", "kgInicial": 234993, "metrosIniciales": 69, "metrosActuales": 61.5, "kgActual": 209450, "kgTeorico": 209450, "fecha": "2026-05-26"}, {"id": "pre0032", "tipo": "Soja", "cosecha": "2026", "bolsa": "14", "lote": "15s/11a", "ubicacion": "", "kgInicial": 229700, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 229700, "kgTeorico": 229700, "fecha": "2026-05-26"}, {"id": "pre0033", "tipo": "Soja", "cosecha": "2026", "bolsa": "15", "lote": "18", "ubicacion": "", "kgInicial": 225160, "metrosIniciales": 69, "metrosActuales": 69.0, "kgActual": 225160, "kgTeorico": 225160, "fecha": "2026-05-26"}, {"id": "pre0034", "tipo": "Soja", "cosecha": "2026", "bolsa": "16", "lote": "18/17a", "ubicacion": "", "kgInicial": 233114, "metrosIniciales": 69, "metrosActuales": 65.0, "kgActual": 219600, "kgTeorico": 219600, "fecha": "2026-05-26"}, {"id": "pre0035", "tipo": "Soja", "cosecha": "2026", "bolsa": "17", "lote": "17a/17b/18", "ubicacion": "", "kgInicial": 224388, "metrosIniciales": 69, "metrosActuales": 65.0, "kgActual": 211380, "kgTeorico": 211380, "fecha": "2026-05-26"}, {"id": "pre0036", "tipo": "Soja", "cosecha": "2026", "bolsa": "18", "lote": "16", "ubicacion": "", "kgInicial": 227275, "metrosIniciales": 69, "metrosActuales": 65.0, "kgActual": 214100, "kgTeorico": 214100, "fecha": "2026-05-26"}, {"id": "pre0037", "tipo": "Soja", "cosecha": "2026", "bolsa": "19", "lote": "7b/10b", "ubicacion": "", "kgInicial": 225917, "metrosIniciales": 69, "metrosActuales": 65.0, "kgActual": 212820, "kgTeorico": 212820, "fecha": "2026-05-26"}, {"id": "pre0038", "tipo": "Soja", "cosecha": "2026", "bolsa": "20", "lote": "12/7b/9", "ubicacion": "", "kgInicial": 230596, "metrosIniciales": 69, "metrosActuales": 66.0, "kgActual": 220570, "kgTeorico": 220570, "fecha": "2026-05-26"}, {"id": "pre0039", "tipo": "Soja", "cosecha": "2026", "bolsa": "21", "lote": "12/7b/9", "ubicacion": "", "kgInicial": 237774, "metrosIniciales": 69, "metrosActuales": 25.0, "kgActual": 86150, "kgTeorico": 86150, "fecha": "2026-05-26"}, {"id": "pre0040", "tipo": "Soja", "cosecha": "2026", "bolsa": "22", "lote": "3a/6a", "ubicacion": "", "kgInicial": 241356, "metrosIniciales": 69, "metrosActuales": 24.0, "kgActual": 83950, "kgTeorico": 83950, "fecha": "2026-05-26"}, {"id": "pre0041", "tipo": "Soja", "cosecha": "2026", "bolsa": "23", "lote": "3a", "ubicacion": "", "kgInicial": 263580, "metrosIniciales": 69, "metrosActuales": 5.0, "kgActual": 19100, "kgTeorico": 19100, "fecha": "2026-05-26"}], "hacTots": {"recria": 894, "engvq": 269, "engnov": 130, "adapt": 0, "total": 1293}, "hacienda": {"fecha": "2026-05-26", "corrales": {"1": {"cat": "Recría", "total": 180, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 0, "tab_m": 0, "tab_h": 180}, "2": {"cat": "Engorde NOV", "total": 130, "five_m": 24, "five_h": 0, "mve_m": 53, "mve_h": 0, "tab_m": 53, "tab_h": 0}, "3": {"cat": "Recría", "total": 65, "five_m": 0, "five_h": 65, "mve_m": 0, "mve_h": 0, "tab_m": 0, "tab_h": 0}, "4": {"cat": "Recría", "total": 81, "five_m": 0, "five_h": 0, "mve_m": 81, "mve_h": 0, "tab_m": 0, "tab_h": 0}, "5": {"cat": "Recría", "total": 136, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 0, "tab_m": 136, "tab_h": 0}, "6": {"cat": "Engorde VQ", "total": 151, "five_m": 0, "five_h": 129, "mve_m": 0, "mve_h": 18, "tab_m": 0, "tab_h": 4}, "7": {"cat": "Recría", "total": 68, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 0, "tab_m": 0, "tab_h": 68}, "8": {"cat": "Recría", "total": 136, "five_m": 32, "five_h": 46, "mve_m": 0, "mve_h": 0, "tab_m": 33, "tab_h": 25}, "9": {"cat": "Engorde VQ", "total": 63, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 63, "tab_m": 0, "tab_h": 0}, "10": {"cat": "Recría", "total": 80, "five_m": 80, "five_h": 0, "mve_m": 0, "mve_h": 0, "tab_m": 0, "tab_h": 0}, "11": {"cat": "", "total": 0, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 0, "tab_m": 0, "tab_h": 0}, "12": {"cat": "Recría", "total": 148, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 0, "tab_m": 148, "tab_h": 0}, "Manga": {"cat": "Engorde VQ", "total": 55, "five_m": 0, "five_h": 0, "mve_m": 0, "mve_h": 55, "tab_m": 0, "tab_h": 0}}, "corralesPrev": {}}, "movimientos": [], "alimentos": []}], "tropas": [], "muertes": [], "ventas": []};
+function preloadData(){
+  // Always load B64 as baseline so new data (tropas, alimentos, etc.) propagates to returning users.
+  // In readonly mode: save result to localStorage (no user edits possible there).
+  // In edit mode: don't save here — load() will merge user's localStorage edits on top.
+  let pd = null;
+  try{ pd = JSON.parse(atob(PRELOADED_B64)); }catch(e){}
+  const src = pd || PRELOADED_STATE;
+  Object.assign(S.semana, src.semana||{});
+  S.granos = src.granos||[];
+  Object.assign(S.hacienda, src.hacienda||{});
+  S.movimientos = src.movimientos||[];
+  if(src.dieta){
+    if(src.dieta.kgan) Object.assign(S.dieta.kgan, src.dieta.kgan);
+    if(src.dieta.ingredientes) S.dieta.ingredientes = src.dieta.ingredientes;
+  }
+  S.alimentos = src.alimentos||[];
+  Object.assign(S.costos, src.costos||{});
+  S.historial = src.historial||[];
+  S.tropas = src.tropas||[];
+  S.muertes = src.muertes||[];
+  S.ventas = src.ventas||[];
+  S.lotesVenta = src.lotesVenta||[];
+  if(IS_READONLY) localStorage.setItem('lafé5', JSON.stringify(S));
+}
+
+
+
+// -- PRELOADED DATA --
+const PRELOADED_B64 = "eyJzZW1hbmEiOnsiZmVjaGEiOiIyMDI2LTA2LTIyIiwibm90YXMiOiIifSwiZ3Jhbm9zIjpbeyJpZCI6InByZTAwMDEiLCJ0aXBvIjoiTWFcdTAwZWR6IGdyYW5vIiwiY29zZWNoYSI6IjIwMjYiLCJib2xzYSI6IjEiLCJsb3RlIjoiNWEvOCIsInViaWNhY2lvbiI6IiIsImtnSW5pY2lhbCI6MjI3NTcwLCJtZXRyb3NJbmljaWFsZXMiOjY5LCJtZXRyb3NBY3R1YWxlcyI6NTMsImtnQWN0dWFsIjoxNzQ4MDAsImtnVGVvcmljbyI6MTc0ODAwLCJmZWNoYSI6IjIwMjYtMDUtMjYifSx7ImlkIjoicHJlMDAwMiIsInRpcG8iOiJNYVx1MDBlZHogZ3Jhbm8iLCJjb3NlY2hhIjoiMjAyNiIsImJvbHNhIjoiMiIsImxvdGUiOiI4IiwidWJpY2FjaW9uIjoiIiwia2dJbmljaWFsIjoyMjM1NTAsIm1ldHJvc0luaWNpYWxlcyI6NjksIm1ldHJvc0FjdHVhbGVzIjo2OSwia2dBY3R1YWwiOjIyMzU1MCwia2dUZW9yaWNvIjoyMjM1NTAsImZlY2hhIjoiMjAyNi0wNS0yNiJ9LHsiaWQiOiJwcmUwMDAzIiwidGlwbyI6Ik1hXHUwMGVkeiBncmFubyIsImNvc2VjaGEiOiIyMDI2IiwiYm9sc2EiOiIzIiwibG90ZSI6IjgiLCJ1YmljYWNpb24iOiIiLCJrZ0luaWNpYWwiOjIyOTkwMCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjY5LCJrZ0FjdHVhbCI6MjI5OTAwLCJrZ1Rlb3JpY28iOjIyOTkwMCwiZmVjaGEiOiIyMDI2LTA1LTI2In0seyJpZCI6InByZTAwMDQiLCJ0aXBvIjoiTWFcdTAwZWR6IGdyYW5vIiwiY29zZWNoYSI6IjIwMjYiLCJib2xzYSI6IjQiLCJsb3RlIjoiOCIsInViaWNhY2lvbiI6IiIsImtnSW5pY2lhbCI6MjEwNTAwLCJtZXRyb3NJbmljaWFsZXMiOjY5LCJtZXRyb3NBY3R1YWxlcyI6NjksImtnQWN0dWFsIjoyMTA1MDAsImtnVGVvcmljbyI6MjEwNTAwLCJmZWNoYSI6IjIwMjYtMDUtMjYifSx7ImlkIjoicHJlMDAwNSIsInRpcG8iOiJNYVx1MDBlZHogZ3Jhbm8iLCJjb3NlY2hhIjoiMjAyNiIsImJvbHNhIjoiNSIsImxvdGUiOiI4IiwidWJpY2FjaW9uIjoiIiwia2dJbmljaWFsIjoyMjMyMDAsIm1ldHJvc0luaWNpYWxlcyI6NjksIm1ldHJvc0FjdHVhbGVzIjo2OSwia2dBY3R1YWwiOjIyMzIwMCwia2dUZW9yaWNvIjoyMjMyMDAsImZlY2hhIjoiMjAyNi0wNS0yNiJ9LHsiaWQiOiJwcmUwMDA2IiwidGlwbyI6Ik1hXHUwMGVkeiBncmFubyIsImNvc2VjaGEiOiIyMDI2IiwiYm9sc2EiOiI2IiwibG90ZSI6IjgiLCJ1YmljYWNpb24iOiIiLCJrZ0luaWNpYWwiOjIxMTIwMCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjY5LCJrZ0FjdHVhbCI6MjExMjAwLCJrZ1Rlb3JpY28iOjIxMTIwMCwiZmVjaGEiOiIyMDI2LTA1LTI2In0seyJpZCI6InByZTAwMDciLCJ0aXBvIjoiTWFcdTAwZWR6IGdyYW5vIiwiY29zZWNoYSI6IjIwMjYiLCJib2xzYSI6IjciLCJsb3RlIjoiMTBhIiwidWJpY2FjaW9uIjoiIiwia2dJbmljaWFsIjoyMjE2MDAsIm1ldHJvc0luaWNpYWxlcyI6NjksIm1ldHJvc0FjdHVhbGVzIjo2OSwia2dBY3R1YWwiOjIyMTYwMCwia2dUZW9yaWNvIjoyMjE2MDAsImZlY2hhIjoiMjAyNi0wNS0yNiJ9LHsiaWQiOiJwcmUwMDA4IiwidGlwbyI6Ik1hXHUwMGVkeiBncmFubyIsImNvc2VjaGEiOiIyMDI2IiwiYm9sc2EiOiI4IiwibG90ZSI6IjEwYSIsInViaWNhY2lvbiI6IiIsImtnSW5pY2lhbCI6MjI3ODAwLCJtZXRyb3NJbmljaWFsZXMiOjY5LCJtZXRyb3NBY3R1YWxlcyI6NjksImtnQWN0dWFsIjoyMjc4MDAsImtnVGVvcmljbyI6MjI3ODAwLCJmZWNoYSI6IjIwMjYtMDUtMjYifSx7ImlkIjoicHJlMDAwOSIsInRpcG8iOiJNYVx1MDBlZHogZ3Jhbm8iLCJjb3NlY2hhIjoiMjAyNiIsImJvbHNhIjoiOSIsImxvdGUiOiIxMGEiLCJ1YmljYWNpb24iOiIiLCJrZ0luaWNpYWwiOjIzNzIwMCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjY5LCJrZ0FjdHVhbCI6MjM3MjAwLCJrZ1Rlb3JpY28iOjIzNzIwMCwiZmVjaGEiOiIyMDI2LTA1LTI2In0seyJpZCI6InByZTAwMTAiLCJ0aXBvIjoiTWFcdTAwZWR6IGdyYW5vIiwiY29zZWNoYSI6IjIwMjYiLCJib2xzYSI6IjEwIiwibG90ZSI6IjEwYSIsInViaWNhY2lvbiI6IiIsImtnSW5pY2lhbCI6MjMzNzAwLCJtZXRyb3NJbmljaWFsZXMiOjY5LCJtZXRyb3NBY3R1YWxlcyI6NjksImtnQWN0dWFsIjoyMzM3MDAsImtnVGVvcmljbyI6MjMzNzAwLCJmZWNoYSI6IjIwMjYtMDUtMjYifSx7ImlkIjoicHJlMDAxMSIsInRpcG8iOiJNYVx1MDBlZHogZ3Jhbm8iLCJjb3NlY2hhIjoiMjAyNiIsImJvbHNhIjoiMTEiLCJsb3RlIjoiMTBhIiwidWJpY2FjaW9uIjoiIiwia2dJbmljaWFsIjoyMjkyMDAsIm1ldHJvc0luaWNpYWxlcyI6NjksIm1ldHJvc0FjdHVhbGVzIjo2OSwia2dBY3R1YWwiOjIyOTIwMCwia2dUZW9yaWNvIjoyMjkyMDAsImZlY2hhIjoiMjAyNi0wNS0yNiJ9LHsiaWQiOiJwcmUwMDEyIiwidGlwbyI6Ik1hXHUwMGVkeiBncmFubyIsImNvc2VjaGEiOiIyMDI1IiwiYm9sc2EiOiI1IiwibG90ZSI6IjkiLCJ1YmljYWNpb24iOiIiLCJrZ0luaWNpYWwiOjI0ODEwMCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjY5LCJrZ0FjdHVhbCI6MjQ4MTAwLCJrZ1Rlb3JpY28iOjI0ODEwMCwiZmVjaGEiOiIyMDI2LTA1LTI2In0seyJpZCI6InByZTAwMTMiLCJ0aXBvIjoiTWFcdTAwZWR6IGdyYW5vIiwiY29zZWNoYSI6IjIwMjUiLCJib2xzYSI6IjEwIiwibG90ZSI6IjJiLzExYi8xNGIiLCJ1YmljYWNpb24iOiIiLCJrZ0luaWNpYWwiOjI1MzY0NCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjUwLCJrZ0FjdHVhbCI6MTgzODAwLCJrZ1Rlb3JpY28iOjE4MzgwMCwiZmVjaGEiOiIyMDI2LTA1LTI2In0seyJpZCI6InByZTAwMTQiLCJ0aXBvIjoiTWFcdTAwZWR6IGdyYW5vIiwiY29zZWNoYSI6IjIwMjQiLCJib2xzYSI6IjQiLCJsb3RlIjoiMTYiLCJ1YmljYWNpb24iOiIiLCJrZ0luaWNpYWwiOjIyNDEwMCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjIsImtnQWN0dWFsIjo2NDk2LCJrZ1Rlb3JpY28iOjEzNTc1OSwiZmVjaGEiOiIyMDI2LTA1LTI2In0seyJpZCI6InByZTAwMTUiLCJ0aXBvIjoiU2lsbyBDZWJhZGEiLCJjb3NlY2hhIjoiMjAyNSIsImJvbHNhIjoiMSIsImxvdGUiOiIzYiIsInViaWNhY2lvbiI6IiIsImtnSW5pY2lhbCI6MzY4NDYwLCJtZXRyb3NJbmljaWFsZXMiOjkwLCJtZXRyb3NBY3R1YWxlcyI6NjEuOCwia2dBY3R1YWwiOjI1MzAwOSwia2dUZW9yaWNvIjoxNTU1NzIsImZlY2hhIjoiMjAyNi0wNS0yNiJ9LHsiaWQiOiJwcmUwMDE2IiwidGlwbyI6IlNpbG8gQ2ViYWRhIiwiY29zZWNoYSI6IjIwMjUiLCJib2xzYSI6IjIiLCJsb3RlIjoiNmIiLCJ1YmljYWNpb24iOiIiLCJrZ0luaWNpYWwiOjM3MzEyMCwibWV0cm9zSW5pY2lhbGVzIjo5MCwibWV0cm9zQWN0dWFsZXMiOjg4LjMsImtnQWN0dWFsIjozNjYwNzIsImtnVGVvcmljbyI6MzczMTIwLCJmZWNoYSI6IjIwMjYtMDUtMjYifSx7ImlkIjoicHJlMDAxNyIsInRpcG8iOiJTaWxvIENlYmFkYSIsImNvc2VjaGEiOiIyMDI1IiwiYm9sc2EiOiIzIiwibG90ZSI6IjViIiwidWJpY2FjaW9uIjoiIiwia2dJbmljaWFsIjozNzY2NDAsIm1ldHJvc0luaWNpYWxlcyI6OTAsIm1ldHJvc0FjdHVhbGVzIjowLCJrZ0FjdHVhbCI6MCwia2dUZW9yaWNvIjozNzY2NDAsImZlY2hhIjoiMjAyNi0wNS0yNiJ9LHsiaWQiOiJwcmUwMDE4IiwidGlwbyI6IlNvamEiLCJjb3NlY2hhIjoiMjAyNCIsImJvbHNhIjoiNyIsImxvdGUiOiIxIiwidWJpY2FjaW9uIjoiIiwia2dJbmljaWFsIjoyNDE2OTgsIm1ldHJvc0luaWNpYWxlcyI6NjksIm1ldHJvc0FjdHVhbGVzIjowLCJrZ0FjdHVhbCI6MTI2NjgsImtnVGVvcmljbyI6NTAwMCwiZmVjaGEiOiIyMDI2LTA1LTI2In0seyJpZCI6InByZTAwMTkiLCJ0aXBvIjoiU29qYSIsImNvc2VjaGEiOiIyMDI2IiwiYm9sc2EiOiIxIiwibG90ZSI6IjkiLCJ1YmljYWNpb24iOiIiLCJrZ0luaWNpYWwiOjIzMDEwMCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjY5LCJrZ0FjdHVhbCI6MjMwMTAwLCJrZ1Rlb3JpY28iOjIzMDEwMCwiZmVjaGEiOiIyMDI2LTA1LTI2In0seyJpZCI6InByZTAwMjAiLCJ0aXBvIjoiU29qYSIsImNvc2VjaGEiOiIyMDI2IiwiYm9sc2EiOiIyIiwibG90ZSI6IjkiLCJ1YmljYWNpb24iOiIiLCJrZ0luaWNpYWwiOjIzMDM4MCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjY5LCJrZ0FjdHVhbCI6MjMwMzgwLCJrZ1Rlb3JpY28iOjIzMDM4MCwiZmVjaGEiOiIyMDI2LTA1LTI2In0seyJpZCI6InByZTAwMjEiLCJ0aXBvIjoiU29qYSIsImNvc2VjaGEiOiIyMDI2IiwiYm9sc2EiOiIzIiwibG90ZSI6IjkvNCIsInViaWNhY2lvbiI6IiIsImtnSW5pY2lhbCI6MjM2NTEwLCJtZXRyb3NJbmljaWFsZXMiOjY5LCJtZXRyb3NBY3R1YWxlcyI6NjksImtnQWN0dWFsIjoyMzY1MTAsImtnVGVvcmljbyI6MjM2NTEwLCJmZWNoYSI6IjIwMjYtMDUtMjYifSx7ImlkIjoicHJlMDAyMiIsInRpcG8iOiJTb2phIiwiY29zZWNoYSI6IjIwMjYiLCJib2xzYSI6IjQiLCJsb3RlIjoiNCIsInViaWNhY2lvbiI6IiIsImtnSW5pY2lhbCI6MjM0NTMwLCJtZXRyb3NJbmljaWFsZXMiOjY5LCJtZXRyb3NBY3R1YWxlcyI6NjksImtnQWN0dWFsIjoyMzQ1MzAsImtnVGVvcmljbyI6MjM0NTMwLCJmZWNoYSI6IjIwMjYtMDUtMjYifSx7ImlkIjoicHJlMDAyMyIsInRpcG8iOiJTb2phIiwiY29zZWNoYSI6IjIwMjYiLCJib2xzYSI6IjUiLCJsb3RlIjoiMXMvMW4vN2EiLCJ1YmljYWNpb24iOiIiLCJrZ0luaWNpYWwiOjIzNDI1MCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjY5LCJrZ0FjdHVhbCI6MjM0MjUwLCJrZ1Rlb3JpY28iOjIzNDI1MCwiZmVjaGEiOiIyMDI2LTA1LTI2In0seyJpZCI6InByZTAwMjQiLCJ0aXBvIjoiU29qYSIsImNvc2VjaGEiOiIyMDI2IiwiYm9sc2EiOiI2IiwibG90ZSI6IjdiIiwidWJpY2FjaW9uIjoiIiwia2dJbmljaWFsIjoyMjA1MDAsIm1ldHJvc0luaWNpYWxlcyI6NjksIm1ldHJvc0FjdHVhbGVzIjo2OSwia2dBY3R1YWwiOjIyMDUwMCwia2dUZW9yaWNvIjoyMjA1MDAsImZlY2hhIjoiMjAyNi0wNS0yNiJ9LHsiaWQiOiJwcmUwMDI1IiwidGlwbyI6IlNvamEiLCJjb3NlY2hhIjoiMjAyNiIsImJvbHNhIjoiNyIsImxvdGUiOiI3YiIsInViaWNhY2lvbiI6IiIsImtnSW5pY2lhbCI6MjIwMDAwLCJtZXRyb3NJbmljaWFsZXMiOjY5LCJtZXRyb3NBY3R1YWxlcyI6NjksImtnQWN0dWFsIjoyMjAwMDAsImtnVGVvcmljbyI6MjIwMDAwLCJmZWNoYSI6IjIwMjYtMDUtMjYifSx7ImlkIjoicHJlMDAyNiIsInRpcG8iOiJTb2phIiwiY29zZWNoYSI6IjIwMjYiLCJib2xzYSI6IjgiLCJsb3RlIjoiMTIiLCJ1YmljYWNpb24iOiIiLCJrZ0luaWNpYWwiOjIyMDMwMCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjY5LCJrZ0FjdHVhbCI6MjIwMzAwLCJrZ1Rlb3JpY28iOjIyMDMwMCwiZmVjaGEiOiIyMDI2LTA1LTI2In0seyJpZCI6InByZTAwMjciLCJ0aXBvIjoiU29qYSIsImNvc2VjaGEiOiIyMDI2IiwiYm9sc2EiOiI5IiwibG90ZSI6IjEyLzE1biIsInViaWNhY2lvbiI6IiIsImtnSW5pY2lhbCI6MjIxODAwLCJtZXRyb3NJbmljaWFsZXMiOjY5LCJtZXRyb3NBY3R1YWxlcyI6NjksImtnQWN0dWFsIjoyMjE4MDAsImtnVGVvcmljbyI6MjIxODAwLCJmZWNoYSI6IjIwMjYtMDUtMjYifSx7ImlkIjoicHJlMDAyOCIsInRpcG8iOiJTb2phIiwiY29zZWNoYSI6IjIwMjYiLCJib2xzYSI6IjEwIiwibG90ZSI6IjEyLzE1biIsInViaWNhY2lvbiI6IiIsImtnSW5pY2lhbCI6MjI0NjAwLCJtZXRyb3NJbmljaWFsZXMiOjY5LCJtZXRyb3NBY3R1YWxlcyI6NjksImtnQWN0dWFsIjoyMjQ2MDAsImtnVGVvcmljbyI6MjI0NjAwLCJmZWNoYSI6IjIwMjYtMDUtMjYifSx7ImlkIjoicHJlMDAyOSIsInRpcG8iOiJTb2phIiwiY29zZWNoYSI6IjIwMjYiLCJib2xzYSI6IjExIiwibG90ZSI6IjEzYSIsInViaWNhY2lvbiI6IiIsImtnSW5pY2lhbCI6MjExOTAwLCJtZXRyb3NJbmljaWFsZXMiOjY5LCJtZXRyb3NBY3R1YWxlcyI6NjksImtnQWN0dWFsIjoyMTE5MDAsImtnVGVvcmljbyI6MjExOTAwLCJmZWNoYSI6IjIwMjYtMDUtMjYifSx7ImlkIjoicHJlMDAzMCIsInRpcG8iOiJTb2phIiwiY29zZWNoYSI6IjIwMjYiLCJib2xzYSI6IjEyIiwibG90ZSI6IjNhIiwidWJpY2FjaW9uIjoiIiwia2dJbmljaWFsIjoyOTE2MzMsIm1ldHJvc0luaWNpYWxlcyI6NjksIm1ldHJvc0FjdHVhbGVzIjozMiwia2dBY3R1YWwiOjEzNTI1MCwia2dUZW9yaWNvIjoxMzUyNTAsImZlY2hhIjoiMjAyNi0wNS0yNiJ9LHsiaWQiOiJwcmUwMDMxIiwidGlwbyI6IlNvamEiLCJjb3NlY2hhIjoiMjAyNiIsImJvbHNhIjoiMTMiLCJsb3RlIjoiMTFhIiwidWJpY2FjaW9uIjoiIiwia2dJbmljaWFsIjoyMzQ5OTMsIm1ldHJvc0luaWNpYWxlcyI6NjksIm1ldHJvc0FjdHVhbGVzIjo2MS41LCJrZ0FjdHVhbCI6MjA5NDUwLCJrZ1Rlb3JpY28iOjIwOTQ1MCwiZmVjaGEiOiIyMDI2LTA1LTI2In0seyJpZCI6InByZTAwMzIiLCJ0aXBvIjoiU29qYSIsImNvc2VjaGEiOiIyMDI2IiwiYm9sc2EiOiIxNCIsImxvdGUiOiIxNXMvMTFhIiwidWJpY2FjaW9uIjoiIiwia2dJbmljaWFsIjoyMjk3MDAsIm1ldHJvc0luaWNpYWxlcyI6NjksIm1ldHJvc0FjdHVhbGVzIjo2OSwia2dBY3R1YWwiOjIyOTcwMCwia2dUZW9yaWNvIjoyMjk3MDAsImZlY2hhIjoiMjAyNi0wNS0yNiJ9LHsiaWQiOiJwcmUwMDMzIiwidGlwbyI6IlNvamEiLCJjb3NlY2hhIjoiMjAyNiIsImJvbHNhIjoiMTUiLCJsb3RlIjoiMTgiLCJ1YmljYWNpb24iOiIiLCJrZ0luaWNpYWwiOjIyNTE2MCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjY5LCJrZ0FjdHVhbCI6MjI1MTYwLCJrZ1Rlb3JpY28iOjIyNTE2MCwiZmVjaGEiOiIyMDI2LTA1LTI2In0seyJpZCI6InByZTAwMzQiLCJ0aXBvIjoiU29qYSIsImNvc2VjaGEiOiIyMDI2IiwiYm9sc2EiOiIxNiIsImxvdGUiOiIxOC8xN2EiLCJ1YmljYWNpb24iOiIiLCJrZ0luaWNpYWwiOjIzMzExNCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjY1LCJrZ0FjdHVhbCI6MjE5NjAwLCJrZ1Rlb3JpY28iOjIxOTYwMCwiZmVjaGEiOiIyMDI2LTA1LTI2In0seyJpZCI6InByZTAwMzUiLCJ0aXBvIjoiU29qYSIsImNvc2VjaGEiOiIyMDI2IiwiYm9sc2EiOiIxNyIsImxvdGUiOiIxN2EvMTdiLzE4IiwidWJpY2FjaW9uIjoiIiwia2dJbmljaWFsIjoyMjQzODgsIm1ldHJvc0luaWNpYWxlcyI6NjksIm1ldHJvc0FjdHVhbGVzIjo2NSwia2dBY3R1YWwiOjIxMTM4MCwia2dUZW9yaWNvIjoyMTEzODAsImZlY2hhIjoiMjAyNi0wNS0yNiJ9LHsiaWQiOiJwcmUwMDM2IiwidGlwbyI6IlNvamEiLCJjb3NlY2hhIjoiMjAyNiIsImJvbHNhIjoiMTgiLCJsb3RlIjoiMTYiLCJ1YmljYWNpb24iOiIiLCJrZ0luaWNpYWwiOjIyNzI3NSwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjY1LCJrZ0FjdHVhbCI6MjE0MTAwLCJrZ1Rlb3JpY28iOjIxNDEwMCwiZmVjaGEiOiIyMDI2LTA1LTI2In0seyJpZCI6InByZTAwMzciLCJ0aXBvIjoiU29qYSIsImNvc2VjaGEiOiIyMDI2IiwiYm9sc2EiOiIxOSIsImxvdGUiOiI3Yi8xMGIiLCJ1YmljYWNpb24iOiIiLCJrZ0luaWNpYWwiOjIyNTkxNywibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjY1LCJrZ0FjdHVhbCI6MjEyODIwLCJrZ1Rlb3JpY28iOjIxMjgyMCwiZmVjaGEiOiIyMDI2LTA1LTI2In0seyJpZCI6InByZTAwMzgiLCJ0aXBvIjoiU29qYSIsImNvc2VjaGEiOiIyMDI2IiwiYm9sc2EiOiIyMCIsImxvdGUiOiIxMi83Yi85IiwidWJpY2FjaW9uIjoiIiwia2dJbmljaWFsIjoyMzA1OTYsIm1ldHJvc0luaWNpYWxlcyI6NjksIm1ldHJvc0FjdHVhbGVzIjo2Niwia2dBY3R1YWwiOjIyMDU3MCwia2dUZW9yaWNvIjoyMjA1NzAsImZlY2hhIjoiMjAyNi0wNS0yNiJ9LHsiaWQiOiJwcmUwMDM5IiwidGlwbyI6IlNvamEiLCJjb3NlY2hhIjoiMjAyNiIsImJvbHNhIjoiMjEiLCJsb3RlIjoiMTIvN2IvOSIsInViaWNhY2lvbiI6IiIsImtnSW5pY2lhbCI6MjM3Nzc0LCJtZXRyb3NJbmljaWFsZXMiOjY5LCJtZXRyb3NBY3R1YWxlcyI6MjUsImtnQWN0dWFsIjo4NjE1MCwia2dUZW9yaWNvIjo4NjE1MCwiZmVjaGEiOiIyMDI2LTA1LTI2In0seyJpZCI6InByZTAwNDAiLCJ0aXBvIjoiU29qYSIsImNvc2VjaGEiOiIyMDI2IiwiYm9sc2EiOiIyMiIsImxvdGUiOiIzYS82YSIsInViaWNhY2lvbiI6IiIsImtnSW5pY2lhbCI6MjQxMzU2LCJtZXRyb3NJbmljaWFsZXMiOjY5LCJtZXRyb3NBY3R1YWxlcyI6MjQsImtnQWN0dWFsIjo4Mzk1MCwia2dUZW9yaWNvIjo4Mzk1MCwiZmVjaGEiOiIyMDI2LTA1LTI2In0seyJpZCI6InByZTAwNDEiLCJ0aXBvIjoiU29qYSIsImNvc2VjaGEiOiIyMDI2IiwiYm9sc2EiOiIyMyIsImxvdGUiOiIzYSIsInViaWNhY2lvbiI6IiIsImtnSW5pY2lhbCI6MjYzNTgwLCJtZXRyb3NJbmljaWFsZXMiOjY5LCJtZXRyb3NBY3R1YWxlcyI6NSwia2dBY3R1YWwiOjE5MTAwLCJrZ1Rlb3JpY28iOjE5MTAwLCJmZWNoYSI6IjIwMjYtMDUtMjYifSx7ImlkIjoiOTExOHJyIiwidGlwbyI6IlNpbG8gTWFcdTAwZWR6IiwiY29zZWNoYSI6IjIwMjYiLCJib2xzYSI6IkJvbHNhIDEiLCJsb3RlIjoiIiwidWJpY2FjaW9uIjoiRmVlZCBsb3RlIiwia2dJbmljaWFsIjozNzIzNjAsIm1ldHJvc0luaWNpYWxlcyI6OTAsIm1ldHJvc0FjdHVhbGVzIjo5MCwia2dBY3R1YWwiOjM3MjM2MCwia2dUZW9yaWNvIjozNzIzNjAsImZlY2hhIjoiMjAyNi0wNS0xNyJ9LHsiaWQiOiI5aWxuczIiLCJ0aXBvIjoiU2lsbyBNYVx1MDBlZHoiLCJjb3NlY2hhIjoiMjAyNiIsImJvbHNhIjoiQm9sc2EgMiIsImxvdGUiOiIiLCJ1YmljYWNpb24iOiIiLCJrZ0luaWNpYWwiOjM3NzM2MCwibWV0cm9zSW5pY2lhbGVzIjo5MCwibWV0cm9zQWN0dWFsZXMiOjkwLCJrZ0FjdHVhbCI6Mzc3MzYwLCJrZ1Rlb3JpY28iOjM3NzM2MCwiZmVjaGEiOiIyMDI2LTA1LTE3In0seyJpZCI6Im5hamJvZyIsInRpcG8iOiJTaWxvIE1hXHUwMGVkeiIsImNvc2VjaGEiOiIyMDI2IiwiYm9sc2EiOiJCb2xzYSAzIiwibG90ZSI6IiIsInViaWNhY2lvbiI6IiIsImtnSW5pY2lhbCI6MzY5NzAwLCJtZXRyb3NJbmljaWFsZXMiOjkwLCJtZXRyb3NBY3R1YWxlcyI6OTAsImtnQWN0dWFsIjozNjk3MDAsImtnVGVvcmljbyI6MzY5NzAwLCJmZWNoYSI6IjIwMjYtMDUtMTcifSx7ImlkIjoiZHpnemM5IiwidGlwbyI6IlNpbG8gTWFcdTAwZWR6IiwiY29zZWNoYSI6IjIwMjYiLCJib2xzYSI6IkJvbHNhIDQiLCJsb3RlIjoiIiwidWJpY2FjaW9uIjoiIiwia2dJbmljaWFsIjozODQ0ODAsIm1ldHJvc0luaWNpYWxlcyI6OTAsIm1ldHJvc0FjdHVhbGVzIjo5MCwia2dBY3R1YWwiOjM4NDQ4MCwia2dUZW9yaWNvIjozODQ0ODAsImZlY2hhIjoiMjAyNi0wNS0xNyJ9LHsiaWQiOiJ0ZXR2cWYiLCJ0aXBvIjoiQ2ViYWRhIiwiY29zZWNoYSI6IjIwMjUiLCJib2xzYSI6IkJvbHNhIDIiLCJsb3RlIjoiTG90ZSA4IiwidWJpY2FjaW9uIjoiRmVlZCBsb3QiLCJrZ0luaWNpYWwiOjg2MTAwLCJtZXRyb3NJbmljaWFsZXMiOjY5LCJtZXRyb3NBY3R1YWxlcyI6MCwia2dBY3R1YWwiOjg2MTAwLCJrZ1Rlb3JpY28iOjg2MTAwLCJmZWNoYSI6IjIwMjUtMTEtMjcifSx7ImlkIjoiZTBsMWhpIiwidGlwbyI6IlRyaWdvIiwiY29zZWNoYSI6IjIwMjUiLCJib2xzYSI6IkJvbHNhIDEiLCJsb3RlIjoiMTFhIiwidWJpY2FjaW9uIjoiMTEiLCJrZ0luaWNpYWwiOjIzNzYwMCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjY5LCJrZ0FjdHVhbCI6MjM3NjAwLCJrZ1Rlb3JpY28iOjAsImZlY2hhIjoiMjAyNS0xMS0yNiJ9LHsiaWQiOiJoOGhiZW0iLCJ0aXBvIjoiVHJpZ28iLCJjb3NlY2hhIjoiMjAyNSIsImJvbHNhIjoiQm9sc2EgMiIsImxvdGUiOiIxMWEvMTVzIiwidWJpY2FjaW9uIjoiMTUiLCJrZ0luaWNpYWwiOjI0MjcwMCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjAsImtnQWN0dWFsIjowLCJrZ1Rlb3JpY28iOjAsImZlY2hhIjoiMjAyNS0xMi0wNCJ9LHsiaWQiOiJoZTB5NzMiLCJ0aXBvIjoiVHJpZ28iLCJjb3NlY2hhIjoiMjAyNSIsImJvbHNhIjoiQm9sc2EgMyIsImxvdGUiOiIxNXMvMTgiLCJ1YmljYWNpb24iOiIxNSIsImtnSW5pY2lhbCI6MjQ5MzIwLCJtZXRyb3NJbmljaWFsZXMiOjY5LCJtZXRyb3NBY3R1YWxlcyI6MCwia2dBY3R1YWwiOjAsImtnVGVvcmljbyI6MCwiZmVjaGEiOiIyMDI1LTEyLTA0In0seyJpZCI6ImI5cm9nbSIsInRpcG8iOiJUcmlnbyIsImNvc2VjaGEiOiIyMDI1IiwiYm9sc2EiOiJCb2xzYSA0IiwibG90ZSI6IjE4IiwidWJpY2FjaW9uIjoiMTgiLCJrZ0luaWNpYWwiOjIzMDc1MCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjY5LCJrZ0FjdHVhbCI6MjMwNzUwLCJrZ1Rlb3JpY28iOjIzMDc1MCwiZmVjaGEiOiIyMDI1LTEyLTA2In0seyJpZCI6Imw3bG5zciIsInRpcG8iOiJUcmlnbyIsImNvc2VjaGEiOiIyMDI1IiwiYm9sc2EiOiJCb2xzYSA1IiwibG90ZSI6IjE4IiwidWJpY2FjaW9uIjoiMTgiLCJrZ0luaWNpYWwiOjI0MDM1MCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjY5LCJrZ0FjdHVhbCI6MjQwMzUwLCJrZ1Rlb3JpY28iOjI0MDM1MCwiZmVjaGEiOiIyMDI1LTEyLTA2In0seyJpZCI6Im1paDR4cyIsInRpcG8iOiJUcmlnbyIsImNvc2VjaGEiOiIyMDI1IiwiYm9sc2EiOiJCb2xzYSA2IiwibG90ZSI6IjE3IiwidWJpY2FjaW9uIjoiMTgiLCJrZ0luaWNpYWwiOjI1MDE3MCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjAsImtnQWN0dWFsIjo3MjkyMSwia2dUZW9yaWNvIjo3MjkyMSwiZmVjaGEiOiIyMDI1LTEyLTA3In0seyJpZCI6Inh3cmd6cSIsInRpcG8iOiJUcmlnbyIsImNvc2VjaGEiOiIyMDI1IiwiYm9sc2EiOiJCb2xzYSA3IiwibG90ZSI6IjE3IiwidWJpY2FjaW9uIjoiMTQiLCJrZ0luaWNpYWwiOjIzNTMwMCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjAsImtnQWN0dWFsIjowLCJrZ1Rlb3JpY28iOjIzNTMwMCwiZmVjaGEiOiIyMDI1LTEyLTA3In0seyJpZCI6ImxmZjVvYiIsInRpcG8iOiJUcmlnbyIsImNvc2VjaGEiOiIyMDI1IiwiYm9sc2EiOiJCb2xzYSA3IiwibG90ZSI6IjE3IiwidWJpY2FjaW9uIjoiMTMiLCJrZ0luaWNpYWwiOjIzNTMwMCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjAsImtnQWN0dWFsIjowLCJrZ1Rlb3JpY28iOjIzNTMwMCwiZmVjaGEiOiIyMDI1LTEyLTA4In0seyJpZCI6ImI0MWEybiIsInRpcG8iOiJUcmlnbyIsImNvc2VjaGEiOiIyMDI1IiwiYm9sc2EiOiJCb2xzYSA4IiwibG90ZSI6IjE2IiwidWJpY2FjaW9uIjoiMTMiLCJrZ0luaWNpYWwiOjI0NzI2MCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjAsImtnQWN0dWFsIjowLCJrZ1Rlb3JpY28iOjI0NzI2MCwiZmVjaGEiOiIyMDI1LTEyLTA5In0seyJpZCI6IjFiaWF4ZyIsInRpcG8iOiJUcmlnbyIsImNvc2VjaGEiOiIyMDI1IiwiYm9sc2EiOiJCb2xzYSA5IiwibG90ZSI6IjE2IiwidWJpY2FjaW9uIjoiMTMiLCJrZ0luaWNpYWwiOjIzMDUwMCwibWV0cm9zSW5pY2lhbGVzIjo2OSwibWV0cm9zQWN0dWFsZXMiOjAsImtnQWN0dWFsIjowLCJrZ1Rlb3JpY28iOjIzMDUwMCwiZmVjaGEiOiIyMDI1LTEyLTA5In1dLCJoYWNpZW5kYSI6eyJmZWNoYSI6IjIwMjYtMDYtMTgiLCJjb3JyYWxlcyI6eyIxIjp7ImNhdCI6IlJlY3JcdTAwZWRhIiwidG90YWwiOjE4MiwiZml2ZV9tIjowLCJmaXZlX2giOjAsIm12ZV9tIjowLCJtdmVfaCI6MCwidGFiX20iOjAsInRhYl9oIjoxODJ9LCIyIjp7ImNhdCI6IkVuZ29yZGUgTk9WIiwidG90YWwiOjEzMCwiZml2ZV9tIjoyNCwiZml2ZV9oIjowLCJtdmVfbSI6NTMsIm12ZV9oIjowLCJ0YWJfbSI6NTMsInRhYl9oIjowfSwiMyI6eyJjYXQiOiJSZWNyXHUwMGVkYSIsInRvdGFsIjo3OCwiZml2ZV9tIjowLCJmaXZlX2giOjc4LCJtdmVfbSI6MCwibXZlX2giOjAsInRhYl9tIjowLCJ0YWJfaCI6MH0sIjQiOnsiY2F0IjoiUmVjclx1MDBlZGEiLCJ0b3RhbCI6OTAsImZpdmVfbSI6MCwiZml2ZV9oIjowLCJtdmVfbSI6MCwibXZlX2giOjkwLCJ0YWJfbSI6MCwidGFiX2giOjB9LCI1Ijp7ImNhdCI6IlJlY3JcdTAwZWRhIiwidG90YWwiOjEzNSwiZml2ZV9tIjowLCJmaXZlX2giOjAsIm12ZV9tIjowLCJtdmVfaCI6MCwidGFiX20iOjEzNSwidGFiX2giOjB9LCI2Ijp7ImNhdCI6IkVuZ29yZGUgVlEiLCJ0b3RhbCI6MTA1LCJmaXZlX20iOjAsImZpdmVfaCI6OTEsIm12ZV9tIjowLCJtdmVfaCI6MTAsInRhYl9tIjowLCJ0YWJfaCI6NH0sIjciOnsiY2F0IjoiUmVjclx1MDBlZGEiLCJ0b3RhbCI6NjcsImZpdmVfbSI6MCwiZml2ZV9oIjowLCJtdmVfbSI6MCwibXZlX2giOjAsInRhYl9tIjowLCJ0YWJfaCI6Njd9LCI4Ijp7ImNhdCI6IlJlY3JcdTAwZWRhIiwidG90YWwiOjEzNCwiZml2ZV9tIjozMCwiZml2ZV9oIjo0NSwibXZlX20iOjAsIm12ZV9oIjowLCJ0YWJfbSI6MzUsInRhYl9oIjoyNH0sIjkiOnsiY2F0IjoiUmVjclx1MDBlZGEiLCJ0b3RhbCI6NjMsImZpdmVfbSI6MCwiZml2ZV9oIjowLCJtdmVfbSI6MCwibXZlX2giOjYzLCJ0YWJfbSI6MCwidGFiX2giOjB9LCIxMCI6eyJjYXQiOiJSZWNyXHUwMGVkYSIsInRvdGFsIjoxMTIsImZpdmVfbSI6MTEyLCJmaXZlX2giOjAsIm12ZV9tIjowLCJtdmVfaCI6MCwidGFiX20iOjAsInRhYl9oIjowfSwiMTEiOnsiY2F0IjoiIiwidG90YWwiOjAsImZpdmVfbSI6MCwiZml2ZV9oIjowLCJtdmVfbSI6MCwibXZlX2giOjAsInRhYl9tIjowLCJ0YWJfaCI6MH0sIjEyIjp7ImNhdCI6IlJlY3JcdTAwZWRhIiwidG90YWwiOjE0NCwiZml2ZV9tIjowLCJmaXZlX2giOjAsIm12ZV9tIjowLCJtdmVfaCI6MCwidGFiX20iOjE0NCwidGFiX2giOjB9LCJNYW5nYSI6eyJjYXQiOiIiLCJ0b3RhbCI6MCwiZml2ZV9tIjowLCJmaXZlX2giOjAsIm12ZV9tIjowLCJtdmVfaCI6MCwidGFiX20iOjAsInRhYl9oIjowfX0sImNvcnJhbGVzUHJldiI6eyIxIjp7ImNhdCI6IlJlY3JcdTAwZWRhIiwidG90YWwiOjE4Mn0sIjIiOnsiY2F0IjoiRW5nb3JkZSBOT1YiLCJ0b3RhbCI6MTMwfSwiMyI6eyJjYXQiOiJSZWNyXHUwMGVkYSIsInRvdGFsIjo3OH0sIjQiOnsiY2F0IjoiUmVjclx1MDBlZGEiLCJ0b3RhbCI6OTB9LCI1Ijp7ImNhdCI6IlJlY3JcdTAwZWRhIiwidG90YWwiOjEzNX0sIjYiOnsiY2F0IjoiRW5nb3JkZSBWUSIsInRvdGFsIjoxNTF9LCI3Ijp7ImNhdCI6IlJlY3JcdTAwZWRhIiwidG90YWwiOjY3fSwiOCI6eyJjYXQiOiJSZWNyXHUwMGVkYSIsInRvdGFsIjoxMzR9LCI5Ijp7ImNhdCI6IlJlY3JcdTAwZWRhIiwidG90YWwiOjYzfSwiMTAiOnsiY2F0IjoiUmVjclx1MDBlZGEiLCJ0b3RhbCI6MTEyfSwiMTEiOnsiY2F0IjoiIiwidG90YWwiOjB9LCIxMiI6eyJjYXQiOiJSZWNyXHUwMGVkYSIsInRvdGFsIjoxNDR9LCJNYW5nYSI6eyJjYXQiOiIiLCJ0b3RhbCI6MH19fSwibW92aW1pZW50b3MiOlt7ImlkIjoibnFiNDlrIiwidGlwbyI6IlZlbnRhIFZhcXVpbGxvbmFzIiwiY2FudGlkYWQiOjgsImRlc2MiOiJNVkUgQ09ycmFsIDYiLCJmZWNoYSI6IjIwMjYtMDYtMjIifSx7ImlkIjoiNnRyNDQ2IiwidGlwbyI6IlZlbnRhIFZhcXVpbGxvbmFzIiwiY2FudGlkYWQiOjM4LCJkZXNjIjoiRklWRSBDb3JyYWwgNiIsImZlY2hhIjoiMjAyNi0wNi0yMiJ9LHsiaWQiOiJkbmgxaHMiLCJ0aXBvIjoiTXVlcnRlIFJlY3JcdTAwZWRhIiwiY2FudGlkYWQiOjEsImRlc2MiOiJGSVZFIE1BY2hvIiwiZmVjaGEiOiIyMDI2LTA1LTA0In0seyJpZCI6InNmMjdlbSIsInRpcG8iOiJNdWVydGUgUmVjclx1MDBlZGEiLCJjYW50aWRhZCI6MSwiZGVzYyI6IkZJVkUgTWFjaG8iLCJmZWNoYSI6IjIwMjYtMDQtMjgifSx7ImlkIjoieHVvZzI5IiwidGlwbyI6Ik11ZXJ0ZSBSZWNyXHUwMGVkYSIsImNhbnRpZGFkIjoxLCJkZXNjIjoiVGFiZWxhIE1hY2hvIiwiZmVjaGEiOiIyMDI2LTA0LTI4In0seyJpZCI6ImIxcnFqdCIsInRpcG8iOiJNdWVydGUgUmVjclx1MDBlZGEiLCJjYW50aWRhZCI6MSwiZGVzYyI6IkZJVkUgSGVtYnJhIiwiZmVjaGEiOiIyMDI2LTA0LTI4In0seyJpZCI6Ind4N2I2YyIsInRpcG8iOiJNdWVydGUgUmVjclx1MDBlZGEiLCJjYW50aWRhZCI6MSwiZGVzYyI6IkZJVkUgbWFjaG8iLCJmZWNoYSI6IjIwMjYtMDQtMjcifSx7ImlkIjoiMnNndGNmIiwidGlwbyI6Ik11ZXJ0ZSBSZWNyXHUwMGVkYSIsImNhbnRpZGFkIjoyLCJkZXNjIjoiVGFiZWxhIGhlbWJyYXMiLCJmZWNoYSI6IjIwMjYtMDQtMjcifSx7ImlkIjoiMGFka2NjIiwidGlwbyI6Ik11ZXJ0ZSBSZWNyXHUwMGVkYSIsImNhbnRpZGFkIjoxLCJkZXNjIjoiRklWRSBIZW1icmFzIFx1MjAxNCBDb3JyYWwgMSIsImZlY2hhIjoiMjAyNi0wNC0yMCJ9LHsiaWQiOiJkeGxydGYiLCJ0aXBvIjoiTXVlcnRlIFJlY3JcdTAwZWRhIiwiY2FudGlkYWQiOjEsImRlc2MiOiJIZW1icmEgTVZFIEMzIiwiZmVjaGEiOiIyMDI2LTA0LTIwIn0seyJpZCI6InF4bGRwYyIsInRpcG8iOiJNdWVydGUgUmVjclx1MDBlZGEiLCJjYW50aWRhZCI6MSwiZGVzYyI6IlRBQkVMQSBNYWNob3MgXHUyMDE0IENvcnJhbCAxMiIsImZlY2hhIjoiMjAyNi0wNS0xMyIsImNvcnJhbCI6IjEyIiwiZmlybWEiOiJUQUJFTEEiLCJzZXhvIjoiTWFjaG9zIn0seyJpZCI6ImJ0MGR4diIsInRpcG8iOiJNdWVydGUgUmVjclx1MDBlZGEiLCJjYW50aWRhZCI6MSwiZGVzYyI6IlRBQkVMQSBNYWNob3MgXHUyMDE0IENvcnJhbCA1IiwiZmVjaGEiOiIyMDI2LTA1LTI0IiwiY29ycmFsIjoiNSIsImZpcm1hIjoiVEFCRUxBIiwic2V4byI6Ik1hY2hvcyJ9LHsiaWQiOiJuYzdnYWciLCJ0aXBvIjoiTXVlcnRlIFJlY3JcdTAwZWRhIiwiY2FudGlkYWQiOjEsImRlc2MiOiJUQUJFTEEgSGVtYnJhcyBcdTIwMTQgQ29ycmFsIDciLCJmZWNoYSI6IjIwMjYtMDYtMDEiLCJjb3JyYWwiOiI3IiwiZmlybWEiOiJUQUJFTEEiLCJzZXhvIjoiSGVtYnJhcyJ9LHsiaWQiOiJsZDN2MjEiLCJ0aXBvIjoiTXVlcnRlIFJlY3JcdTAwZWRhIiwiY2FudGlkYWQiOjEsImRlc2MiOiJUQUJFTEEgTWFjaG9zIFx1MjAxNCBDb3JyYWwgMTIiLCJmZWNoYSI6IjIwMjYtMDYtMDEiLCJjb3JyYWwiOiIxMiIsImZpcm1hIjoiVEFCRUxBIiwic2V4byI6Ik1hY2hvcyJ9LHsiaWQiOiJuMHdpamIiLCJ0aXBvIjoiTXVlcnRlIFJlY3JcdTAwZWRhIiwiY2FudGlkYWQiOjEsImRlc2MiOiJUQUJFTEEgTWFjaG9zIFx1MjAxNCBDb3JyYWwgMTIiLCJmZWNoYSI6IjIwMjYtMDYtMTQiLCJjb3JyYWwiOiIxMiIsImZpcm1hIjoiVEFCRUxBIiwic2V4byI6Ik1hY2hvcyJ9XSwiZGlldGEiOnsia2dhbiI6eyJyZWNyaWEiOjE2LCJlbmd2cSI6MTQsImVuZ25vdiI6MTQsImFkYXB0IjoxMH0sImluZ3JlZGllbnRlcyI6W3sibiI6IlBlbGxldCBkZSBHcyIsInAiOnsicmVjcmlhIjoxMiwiZW5ndnEiOjksImVuZ25vdiI6OSwiYWRhcHQiOjl9fSx7Im4iOiJTaWxvIENlYmFkYSIsInAiOnsicmVjcmlhIjo3Ny41LCJlbmd2cSI6MjUsImVuZ25vdiI6MjUsImFkYXB0IjozMH19LHsibiI6IlNpbG8gTWFcdTAwZWR6IiwicCI6eyJyZWNyaWEiOjAsImVuZ3ZxIjowLCJlbmdub3YiOjAsImFkYXB0IjowfX0seyJuIjoiTWFcdTAwZWR6IGdyYW5vIiwicCI6eyJyZWNyaWEiOjksImVuZ3ZxIjo2My43LCJlbmdub3YiOjYzLjcsImFkYXB0Ijo1MH19LHsibiI6IkNlYmFkYSIsInAiOnsicmVjcmlhIjowLCJlbmd2cSI6MCwiZW5nbm92IjowLCJhZGFwdCI6MH19LHsibiI6IkV4cGVsbGVyIFNvamEiLCJwIjp7InJlY3JpYSI6MCwiZW5ndnEiOjAsImVuZ25vdiI6MCwiYWRhcHQiOjB9fSx7Im4iOiJOXHUwMGZhY2xlbyBUZXJuZXJvcyIsInAiOnsicmVjcmlhIjoxLCJlbmd2cSI6MCwiZW5nbm92IjowLCJhZGFwdCI6MX19LHsibiI6Ik5cdTAwZmFjbGVvIEZTVSIsInAiOnsicmVjcmlhIjowLCJlbmd2cSI6MS41LCJlbmdub3YiOjEuNSwiYWRhcHQiOjB9fSx7Im4iOiJVcmVhIiwicCI6eyJyZWNyaWEiOjAuNSwiZW5ndnEiOjAuOCwiZW5nbm92IjowLjgsImFkYXB0IjowLjV9fSx7Im4iOiJIb3RlbGVyXHUwMGVkYSIsInAiOnsicmVjcmlhIjowLCJlbmd2cSI6MCwiZW5nbm92IjowLCJhZGFwdCI6OS41fX1dfSwiYWxpbWVudG9zIjpbeyJpZCI6InQwYTA4dSIsIm5vbWJyZSI6IlBlbGxldCBkZSBHcyIsInN0b2NrIjowLCJmZWNoYSI6IjIwMjYtMDYtMjIifV0sImNvc3RvcyI6eyJkb2xhciI6MTQ2MS41LCJwdHJvIjo1OTAwLCJwdHJhIjo1NjAwLCJwdm4iOjUwMDAsInB2diI6NDYwMCwicHJlY2lvcyI6eyJQZWxsZXQgZGUgR3MiOjI4OCwiU2lsbyBDZWJhZGEiOjExNi45LCJNYVx1MDBlZHogZ3Jhbm8iOjE4My4xLCJDZWJhZGEiOjAsIkV4cGVsbGVyIFNvamEiOjI4OCwiTlx1MDBmYWNsZW8gVGVybmVyb3MiOjQ0OSwiTlx1MDBmYWNsZW8gRlNVIjo1NzMuNiwiVXJlYSI6MTEwMy40LCJIb3RlbGVyXHUwMGVkYSI6MjE5LjJ9LCJkUk4iOjkwLCJkUlYiOjYwLCJkQSI6MCwiZEVOIjoxMDAsImRFViI6MTAwfSwiaGlzdG9yaWFsIjpbeyJpZCI6Im8zemlhZCIsImZlY2hhIjoiMjAyNi0wNi0yMiIsImxhYmVsIjoiU2VtYW5hIDIwMjYtMDYtMjIifSx7ImlkIjoiY3hlaGFzIiwiZmVjaGEiOiIyMDI2LTA2LTE4IiwibGFiZWwiOiJTZW1hbmEgMjAyNi0wNi0xOCJ9LHsiaWQiOiIzYThhOXAiLCJmZWNoYSI6IjIwMjYtMDUtMjYiLCJsYWJlbCI6IlNlbWFuYSAyMDI2LTA1LTI2In1dLCJ0cm9wYXMiOlt7ImlkIjoidnUyZmxmIiwiY29ycmFsIjoiMiIsImZpcm1hIjoiVEFCRUxBIiwib3JpZ2VuIjoiR3VpZG8geSBtYWlwXHUwMGZhIiwic2V4byI6Ik1hY2hvcyIsImZpbmdyZXNvIjoiMjAyNS0xMi0xOCIsImNhbnQiOjUzLCJwZXNvSW5pIjoyMjAsInB2MSI6MzkwLCJwdjIiOjQ2MCwiZmVjaGFBZHAiOiIxOC8wMi8yMDI2IiwiZmVjaGFFbmciOiIwNC8wMy8yMDI2IiwiZnNhbDEiOiIwNy8wNi8yMDI2IiwiZHRvdDEiOjE3MiwiZnNhbDIiOiIwNC8wOC8yMDI2IiwiZHRvdDIiOjIzMH0seyJpZCI6InZlZzFiaSIsImNvcnJhbCI6IjYiLCJmaXJtYSI6IkZJVkUiLCJvcmlnZW4iOiJHdWlkbyAiLCJzZXhvIjoiSGVtYnJhcyIsImZpbmdyZXNvIjoiMjAyNS0xMi0wMiIsImNhbnQiOjY0LCJwZXNvSW5pIjoyMTYsInB2MSI6MzYwLCJwdjIiOjM5MCwiZmVjaGFBZHAiOiIzMS8xMi8yMDI1IiwiZmVjaGFFbmciOiIxNC8wMS8yMDI2IiwiZnNhbDEiOiIyNy8wNC8yMDI2IiwiZHRvdDEiOjE0NywiZnNhbDIiOiIyNC8wNS8yMDI2IiwiZHRvdDIiOjE3NH0seyJpZCI6InlhbWkwZCIsImNvcnJhbCI6IjYiLCJmaXJtYSI6IkZJVkUiLCJvcmlnZW4iOiJHdWlkbyAiLCJzZXhvIjoiSGVtYnJhcyIsImZpbmdyZXNvIjoiMjAyNS0xMi0yMCIsImNhbnQiOjY1LCJwZXNvSW5pIjoxNzAsInB2MSI6MzYwLCJwdjIiOjM5MCwiZmVjaGFBZHAiOiIxNy8wMy8yMDI2IiwiZmVjaGFFbmciOiIzMS8wMy8yMDI2IiwiZnNhbDEiOiIxMi8wNy8yMDI2IiwiZHRvdDEiOjIwNSwiZnNhbDIiOiIwOC8wOC8yMDI2IiwiZHRvdDIiOjIzMn0seyJpZCI6InB6YmlpcCIsImNvcnJhbCI6IjYiLCJmaXJtYSI6IlRBQkVMQSIsIm9yaWdlbiI6ImNhbXBvIG51ZXZvIiwic2V4byI6IkhlbWJyYXMiLCJmaW5ncmVzbyI6IjIwMjUtMDctMDMiLCJjYW50Ijo0LCJwZXNvSW5pIjoyMTQsInB2MSI6MzQwLCJwdjIiOjM5MCwiZmVjaGFBZHAiOiIwNC8wOC8yMDI1IiwiZmVjaGFFbmciOiIxOC8wOC8yMDI1IiwiZnNhbDEiOiIyMC8wMi8yMDI2IiwiZHRvdDEiOjIzMywiZnNhbDIiOiIzMS8wNS8yMDI2IiwiZHRvdDIiOjMzM30seyJpZCI6ImVjNzRzaiIsImNvcnJhbCI6IjIiLCJmaXJtYSI6IkZJVkUiLCJvcmlnZW4iOiJQZWh1YWpvIiwic2V4byI6Ik1hY2hvcyIsImZpbmdyZXNvIjoiMjAyNS0wOS0yNiIsImNhbnQiOjI0LCJwZXNvSW5pIjoyMTQsInB2MSI6MzQwLCJwdjIiOjM5MCwiZmVjaGFBZHAiOiIwNC8xMi8yMDI1IiwiZmVjaGFFbmciOiIxOC8xMi8yMDI1IiwiZnNhbDEiOiIwOS8wMi8yMDI2IiwiZHRvdDEiOjEzNywiZnNhbDIiOiIyMy8wMy8yMDI2IiwiZHRvdDIiOjE3OX0seyJpZCI6Imh2M2M0YiIsImNvcnJhbCI6IjYiLCJmaXJtYSI6Ik1WRSIsIm9yaWdlbiI6Ik1haXBcdTAwZmEiLCJzZXhvIjoiSGVtYnJhcyIsImZpbmdyZXNvIjoiMjAyNS0xMi0xOSIsImNhbnQiOjE4LCJwZXNvSW5pIjoxODAsInB2MSI6MzQwLCJwdjIiOjM5MCwiZmVjaGFBZHAiOiIwMy8wMy8yMDI2IiwiZmVjaGFFbmciOiIxNy8wMy8yMDI2IiwiZnNhbDEiOiIxMC8wNi8yMDI2IiwiZHRvdDEiOjE3NCwiZnNhbDIiOiIyNS8wNy8yMDI2IiwiZHRvdDIiOjIxOX0seyJpZCI6InV2d2l1biIsImNvcnJhbCI6IjIiLCJmaXJtYSI6Ik1WRSIsIm9yaWdlbiI6IlJhdWNoIHkgZ3VpZG8iLCJzZXhvIjoiTWFjaG9zIiwiZmluZ3Jlc28iOiIyMDI1LTEyLTE5IiwiY2FudCI6NTMsInBlc29JbmkiOjIxNiwicHYxIjozOTAsInB2MiI6NDYwLCJmZWNoYUFkcCI6IjI0LzAyLzIwMjYiLCJmZWNoYUVuZyI6IjEwLzAzLzIwMjYiLCJmc2FsMSI6IjEzLzA2LzIwMjYiLCJkdG90MSI6MTc3LCJmc2FsMiI6IjEwLzA4LzIwMjYiLCJkdG90MiI6MjM1fSx7ImlkIjoiNjQyemc1IiwiY29ycmFsIjoiOSIsImZpcm1hIjoiTVZFIiwib3JpZ2VuIjoiTGEgUmluY29uYWRhIiwic2V4byI6IkhlbWJyYXMiLCJmaW5ncmVzbyI6IjIwMjYtMDUtMjgiLCJjYW50Ijo4LCJwZXNvSW5pIjoxODAsInB2MSI6MzYwLCJwdjIiOjM5MCwiZmVjaGFBZHAiOiIwMi8wOC8yMDI2IiwiZmVjaGFFbmciOiIxNi8wOC8yMDI2IiwiZnNhbDEiOiIyNy8xMS8yMDI2IiwiZHRvdDEiOjE5MiwiZnNhbDIiOiIyNC8xMi8yMDI2IiwiZHRvdDIiOjIxOX0seyJpZCI6ImFxN3hiMyIsImNvcnJhbCI6IjEiLCJmaXJtYSI6IlRBQkVMQSIsIm9yaWdlbiI6IkxhIFJpbmNvbmFkYSIsInNleG8iOiJIZW1icmFzIiwiZmluZ3Jlc28iOiIyMDI2LTA1LTIwIiwiY2FudCI6NDQsInBlc29JbmkiOjE4MCwicHYxIjozNjAsInB2MiI6MzkwLCJmZWNoYUFkcCI6IjAyLzA4LzIwMjYiLCJmZWNoYUVuZyI6IjE2LzA4LzIwMjYiLCJmc2FsMSI6IjI3LzExLzIwMjYiLCJkdG90MSI6MTkyLCJmc2FsMiI6IjI0LzEyLzIwMjYiLCJkdG90MiI6MjE5fSx7ImlkIjoiY2hjZTgyIiwiY29ycmFsIjoiMTAiLCJmaXJtYSI6IkZJVkUiLCJvcmlnZW4iOiJMYSBSaW5jb25hZGEiLCJzZXhvIjoiTWFjaG9zIiwiZmluZ3Jlc28iOiIyMDI2LTA1LTIwIiwiY2FudCI6OSwicGVzb0luaSI6MTkwLCJwdjEiOjM5MCwicHYyIjo0NjAsImZlY2hhQWRwIjoiMjcvMDgvMjAyNiIsImZlY2hhRW5nIjoiMTAvMDkvMjAyNiIsImZzYWwxIjoiMTQvMTIvMjAyNiIsImR0b3QxIjoyMDksImZzYWwyIjoiMTAvMDIvMjAyNyIsImR0b3QyIjoyNjd9LHsiaWQiOiJnNmR3Z2IiLCJjb3JyYWwiOiIxMiIsImZpcm1hIjoiVEFCRUxBIiwib3JpZ2VuIjoiTGEgUmluY29uYWRhIiwic2V4byI6Ik1hY2hvcyIsImZpbmdyZXNvIjoiMjAyNi0wNS0yMCIsImNhbnQiOjgxLCJwZXNvSW5pIjoxOTAsInB2MSI6MzkwLCJwdjIiOjQ2MCwiZmVjaGFBZHAiOiIyNy8wOC8yMDI2IiwiZmVjaGFFbmciOiIxMC8wOS8yMDI2IiwiZnNhbDEiOiIxNC8xMi8yMDI2IiwiZHRvdDEiOjIwOSwiZnNhbDIiOiIxMC8wMi8yMDI3IiwiZHRvdDIiOjI2N30seyJpZCI6ImZwZTR4MiIsImNvcnJhbCI6IjEyIiwiZmlybWEiOiJUQUJFTEEiLCJvcmlnZW4iOiJMYSBSaW5jb25hZGEiLCJzZXhvIjoiTWFjaG9zIiwiZmluZ3Jlc28iOiIyMDI2LTA1LTEyIiwiY2FudCI6NjgsInBlc29JbmkiOjE5MCwicHYxIjozOTAsInB2MiI6NDYwLCJmZWNoYUFkcCI6IjE5LzA4LzIwMjYiLCJmZWNoYUVuZyI6IjAyLzA5LzIwMjYiLCJmc2FsMSI6IjA2LzEyLzIwMjYiLCJkdG90MSI6MjA5LCJmc2FsMiI6IjAyLzAyLzIwMjciLCJkdG90MiI6MjY3fSx7ImlkIjoic3VzOTU3IiwiY29ycmFsIjoiNyIsImZpcm1hIjoiVEFCRUxBIiwib3JpZ2VuIjoiTGEgUmluY29uYWRhIiwic2V4byI6IkhlbWJyYXMiLCJmaW5ncmVzbyI6IjIwMjYtMDUtMTIiLCJjYW50Ijo2OCwicGVzb0luaSI6MTcwLCJwdjEiOjM0MCwicHYyIjozOTAsImZlY2hhQWRwIjoiMDcvMDgvMjAyNiIsImZlY2hhRW5nIjoiMjEvMDgvMjAyNiIsImZzYWwxIjoiMTQvMTEvMjAyNiIsImR0b3QxIjoxODcsImZzYWwyIjoiMjkvMTIvMjAyNiIsImR0b3QyIjoyMzJ9LHsiaWQiOiJ5Y3RnMm4iLCJjb3JyYWwiOiI0IiwiZmlybWEiOiJNVkUiLCJvcmlnZW4iOiJMYSBSaW5jb25hZGEiLCJzZXhvIjoiTWFjaG9zIiwiZmluZ3Jlc28iOiIyMDI2LTA1LTE1IiwiY2FudCI6ODEsInBlc29JbmkiOjE5MiwicHYxIjozOTAsInB2MiI6NDYwLCJmZWNoYUFkcCI6IjIwLzA4LzIwMjYiLCJmZWNoYUVuZyI6IjAzLzA5LzIwMjYiLCJmc2FsMSI6IjA3LzEyLzIwMjYiLCJkdG90MSI6MjA3LCJmc2FsMiI6IjAzLzAyLzIwMjciLCJkdG90MiI6MjY1fSx7ImlkIjoia2YwbmZ5IiwiY29ycmFsIjoiOSIsImZpcm1hIjoiTVZFIiwib3JpZ2VuIjoiTGEgUmluY29uYWRhIiwic2V4byI6IkhlbWJyYXMiLCJmaW5ncmVzbyI6IjIwMjYtMDUtMTUiLCJjYW50Ijo1NSwicGVzb0luaSI6MTgyLCJwdjEiOjM0MCwicHYyIjozOTAsImZlY2hhQWRwIjoiMjYvMDcvMjAyNiIsImZlY2hhRW5nIjoiMDkvMDgvMjAyNiIsImZzYWwxIjoiMDIvMTEvMjAyNiIsImR0b3QxIjoxNzIsImZzYWwyIjoiMTcvMTIvMjAyNiIsImR0b3QyIjoyMTd9LHsiaWQiOiJremlmaHciLCJjb3JyYWwiOiIxIiwiZmlybWEiOiJUQUJFTEEiLCJvcmlnZW4iOiJMYSBSaW5jb25hZGEiLCJzZXhvIjoiSGVtYnJhcyIsImZpbmdyZXNvIjoiMjAyNi0wNS0wNiIsImNhbnQiOjY4LCJwZXNvSW5pIjoxNjUsInB2MSI6MzQwLCJwdjIiOjM5MCwiZmVjaGFBZHAiOiIwNy8wOC8yMDI2IiwiZmVjaGFFbmciOiIyMS8wOC8yMDI2IiwiZnNhbDEiOiIxNC8xMS8yMDI2IiwiZHRvdDEiOjE5MywiZnNhbDIiOiIyOS8xMi8yMDI2IiwiZHRvdDIiOjIzOH0seyJpZCI6InJ5cGJ6MSIsImNvcnJhbCI6IjUiLCJmaXJtYSI6IlRBQkVMQSIsIm9yaWdlbiI6IkxhIFJpbmNvbmFkYSIsInNleG8iOiJNYWNob3MiLCJmaW5ncmVzbyI6IjIwMjYtMDUtMDYiLCJjYW50Ijo2OCwicGVzb0luaSI6MTg1LCJwdjEiOjM5MCwicHYyIjo0NjAsImZlY2hhQWRwIjoiMjAvMDgvMjAyNiIsImZlY2hhRW5nIjoiMDMvMDkvMjAyNiIsImZzYWwxIjoiMDcvMTIvMjAyNiIsImR0b3QxIjoyMTYsImZzYWwyIjoiMDMvMDIvMjAyNyIsImR0b3QyIjoyNzR9LHsiaWQiOiIxZmowZXkiLCJjb3JyYWwiOiI1IiwiZmlybWEiOiJUQUJFTEEiLCJvcmlnZW4iOiJMYSBSaW5jb25hZGEiLCJzZXhvIjoiTWFjaG9zIiwiZmluZ3Jlc28iOiIyMDI2LTA0LTI5IiwiY2FudCI6NjgsInBlc29JbmkiOjE4NSwicHYxIjozOTAsInB2MiI6NDYwLCJmZWNoYUFkcCI6IjEzLzA4LzIwMjYiLCJmZWNoYUVuZyI6IjI3LzA4LzIwMjYiLCJmc2FsMSI6IjMwLzExLzIwMjYiLCJkdG90MSI6MjE2LCJmc2FsMiI6IjI3LzAxLzIwMjciLCJkdG90MiI6Mjc0fSx7ImlkIjoia3M2emE4IiwiY29ycmFsIjoiOCIsImZpcm1hIjoiRklWRSIsIm9yaWdlbiI6IkxhIFJpbmNvbmFkYSIsInNleG8iOiJIZW1icmFzIiwiZmluZ3Jlc28iOiIyMDI2LTA0LTE3IiwiY2FudCI6NDYsInBlc29JbmkiOjIxMCwicHYxIjozNDAsInB2MiI6MzkwLCJmZWNoYUFkcCI6IjI0LzA1LzIwMjYiLCJmZWNoYUVuZyI6IjA3LzA2LzIwMjYiLCJmc2FsMSI6IjMxLzA4LzIwMjYiLCJkdG90MSI6MTM3LCJmc2FsMiI6IjE1LzEwLzIwMjYiLCJkdG90MiI6MTgyfSx7ImlkIjoic3FwdGp5IiwiY29ycmFsIjoiOCIsImZpcm1hIjoiVEFCRUxBIiwib3JpZ2VuIjoiTGEgUmluY29uYWRhIiwic2V4byI6Ik1hY2hvcyIsImZpbmdyZXNvIjoiMjAyNi0wNC0xNyIsImNhbnQiOjMzLCJwZXNvSW5pIjoyMDgsInB2MSI6MzkwLCJwdjIiOjQ2MCwiZmVjaGFBZHAiOiIwMy8wNy8yMDI2IiwiZmVjaGFFbmciOiIxNy8wNy8yMDI2IiwiZnNhbDEiOiIyMC8xMC8yMDI2IiwiZHRvdDEiOjE4NywiZnNhbDIiOiIxNy8xMi8yMDI2IiwiZHRvdDIiOjI0NX0seyJpZCI6InVma25waCIsImZpcm1hIjoiRklWRSIsIm9yaWdlbiI6IkxhIFJpbmNvbmFkYSIsInNleG8iOiJNYWNob3MiLCJmaW5ncmVzbyI6IjIwMjYtMDQtMTciLCJjYW50IjozMiwicGVzb0luaSI6MjEwLCJwdjEiOjM5MCwicHYyIjo0NjAsImZlY2hhQWRwIjoiMzAvMDYvMjAyNiIsImZlY2hhRW5nIjoiMTQvMDcvMjAyNiIsImZzYWwxIjoiMTcvMTAvMjAyNiIsImR0b3QxIjoxODQsImZzYWwyIjoiMTQvMTIvMjAyNiIsImR0b3QyIjoyNDIsImNvcnJhbCI6IjgifSx7ImlkIjoiNGl1eXA1IiwiZmlybWEiOiJUQUJFTEEiLCJvcmlnZW4iOiJMYSBSaW5jb25hZGEiLCJzZXhvIjoiSGVtYnJhcyIsImZpbmdyZXNvIjoiMjAyNi0wNC0xNyIsImNhbnQiOjI1LCJwZXNvSW5pIjoyMDgsInB2MSI6MzQwLCJwdjIiOjQwMCwiZmVjaGFFbmciOiIwOS8wNi8yMDI2IiwiZnNhbDEiOiIwMi8wOS8yMDI2IiwiZHRvdDEiOjEzOSwiZnNhbDIiOiIyNy8xMC8yMDI2IiwiZHRvdDIiOjE5NCwiY29ycmFsIjoiOCIsImZlY2hhQWRwIjoiMjYvMDUvMjAyNiJ9LHsiaWQiOiIyZDN3a24iLCJmaXJtYSI6IlRBQkVMQSIsIm9yaWdlbiI6IkxhIFJpbmNvbmFkYSIsInNleG8iOiJIZW1icmFzIiwiZmluZ3Jlc28iOiIyMDI2LTA0LTI5IiwiY2FudCI6NjgsInBlc29JbmkiOjE4MiwicHYxIjozNDAsInB2MiI6NDAwLCJmZWNoYUVuZyI6IjI0LzA3LzIwMjYiLCJmc2FsMSI6IjE3LzEwLzIwMjYiLCJkdG90MSI6MTcyLCJmc2FsMiI6IjExLzEyLzIwMjYiLCJkdG90MiI6MjI3LCJjb3JyYWwiOiIxIiwiZmVjaGFBZHAiOiIxMC8wNy8yMDI2In0seyJpZCI6IjN0bjNseCIsImZpcm1hIjoiRklWRSIsIm9yaWdlbiI6IkxhIFJpbmNvbmFkYSIsInNleG8iOiJIZW1icmFzIiwiZmluZ3Jlc28iOiIyMDI2LTA0LTI3IiwiY2FudCI6NjUsInBlc29JbmkiOjE4NSwicHYxIjozNDAsInB2MiI6NDAwLCJmZWNoYUVuZyI6IjE4LzA3LzIwMjYiLCJmc2FsMSI6IjExLzEwLzIwMjYiLCJkdG90MSI6MTY4LCJmc2FsMiI6IjA1LzEyLzIwMjYiLCJkdG90MiI6MjIzLCJjb3JyYWwiOiIzIiwiZmVjaGFBZHAiOiIwNC8wNy8yMDI2In0seyJpZCI6IjllYzltbyIsImZpcm1hIjoiRklWRSIsIm9yaWdlbiI6IkxhIFJpbmNvbmFkYSIsInNleG8iOiJNYWNob3MiLCJmaW5ncmVzbyI6IjIwMjYtMDQtMjciLCJjYW50Ijo3MSwicGVzb0luaSI6MTgwLCJwdjEiOjM5MCwicHYyIjo0NjAsImZlY2hhRW5nIjoiMzEvMDgvMjAyNiIsImZzYWwxIjoiMDQvMTIvMjAyNiIsImR0b3QxIjoyMjIsImZzYWwyIjoiMzEvMDEvMjAyNyIsImR0b3QyIjoyODAsImZlY2hhQWRwIjoiMTcvMDgvMjAyNiIsImNvcnJhbCI6IjEwIn1dLCJtdWVydGVzIjpbeyJpZCI6InZzbmJ4MiIsImZlY2hhIjoiMjAyNi0wNS0xMyIsInRyb3BhSWQiOiJmcGU0eDIiLCJjb3JyYWwiOiIxMiIsImZpcm1hIjoiVEFCRUxBIiwic2V4byI6Ik1hY2hvcyIsImNhdCI6IlJlY3JcdTAwZWRhIiwiY2FudCI6MSwib2JzIjoiIn1dLCJ2ZW50YXMiOltdfQ==";
+
+// Then try to load saved user data (if any valid changes were made)
+(async function initLaFe(){
+try{
+  preloadData();
+  if(IS_READONLY){
+    await loadFromCloud(); // pull the latest saved week straight from Supabase
+  } else {
+    load();
+  }
+  // Migración: si tropas/muertes/ventas vacíos, intentar importar desde key vieja 'lafé3'
+  try{
+    const oldRaw=localStorage.getItem('lafé3');
+    if(oldRaw){
+      const old=JSON.parse(oldRaw);
+      if((!S.tropas||!S.tropas.length)&&old.tropas&&old.tropas.length){S.tropas=old.tropas;console.log('Migrado tropas desde lafé3:',S.tropas.length);}
+      if((!S.muertes||!S.muertes.length)&&old.muertes&&old.muertes.length){S.muertes=old.muertes;}
+      if((!S.ventas||!S.ventas.length)&&old.ventas&&old.ventas.length){S.ventas=old.ventas;}
+      if((!S.historial||!S.historial.length)&&old.historial&&old.historial.length){S.historial=old.historial;}
+      save(); // guardar todo bajo lafé5
+    }
+  }catch(e2){console.warn('Migración lafé3 falló:',e2);}
+  // Fallback final: si tropas sigue vacío, cargar desde PRELOADED_B64
+  if(!S.tropas||!S.tropas.length){
+    try{
+      const pd=JSON.parse(atob(PRELOADED_B64));
+      if(pd.tropas&&pd.tropas.length){
+        S.tropas=pd.tropas;
+        if(!S.muertes||!S.muertes.length) S.muertes=pd.muertes||[];
+        if(!S.ventas||!S.ventas.length) S.ventas=pd.ventas||[];
+        save();
+        console.log('Tropas cargadas desde PRELOADED_B64:', S.tropas.length);
+      }
+    }catch(e3){console.warn('Fallback PRELOADED_B64 falló:',e3);}
+  }
+  CORRALES.forEach(c=>{if(!S.hacienda.corrales[c])S.hacienda.corrales[c]={cat:'',total:0,five_m:0,five_h:0,mve_m:0,mve_h:0,tab_m:0,tab_h:0};});
+  document.getElementById('dash-fecha').value=S.semana.fecha;
+  renderDash();
+}catch(e){console.error('Load error:',e);}
+})();
+
+async function importarDesdeExcel(){
+  const btn=document.getElementById('btn-importar');
+  if(!btn)return;
+  if(btn.dataset.confirmando==='1'){
+    btn.dataset.confirmando='';
+    btn.textContent='⏳ Importando...';btn.disabled=true;
+    const input=document.createElement('input');
+    input.type='file';input.accept='.xlsx,.xls';
+    input.onchange=async(e)=>{
+      const file=e.target.files[0];if(!file){btn.disabled=false;btn.textContent='📥 Importar Excel';return;}
+      try{
+        const data=await file.arrayBuffer();
+        const wb=XLSX.read(data,{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const rows=XLSX.utils.sheet_to_json(ws,{header:1});
+        let imported=0;
+        rows.forEach(r=>{
+          const cor=String(r[0]||'').trim();
+          const cat=String(r[1]||'').trim();
+          const tot=Number(r[2]);
+          const key=isNaN(Number(cor))?cor:String(Number(cor));
+          if(CORRALES.map(String).includes(key)&&!isNaN(tot)&&tot>=0){
+            if(!S.hacienda.corrales[key])S.hacienda.corrales[key]={};
+            S.hacienda.corrales[key].cat=cat;
+            S.hacienda.corrales[key].total=tot;
+            imported++;
+          }
+        });
+        save();renderDash();
+        alert('✅ Importado: '+imported+' corrales actualizados');
+      }catch(err){alert('❌ Error al importar: '+err.message);}
+      btn.textContent='📥 Importar Excel';btn.disabled=false;
+    };
+    input.click();
+  } else {
+    btn.dataset.confirmando='1';
+    btn.textContent='⚠️ ¿Confirmar importación?';
+    setTimeout(()=>{btn.dataset.confirmando='';btn.textContent='📥 Importar Excel';},4000);
+  }
+}
+
+async function publicarNetlify(){
+  const NETLIFY_TOKEN='nfp_7DY2Cfc6nQUs1E9zjz7FMyTBeBkCxPtW46d0';
+  const NETLIFY_SITE='scintillating-torte-4e8437';
+  const btn=document.getElementById('btn-publicar');
+  if(!btn||btn.dataset.working)return;
+  btn.dataset.working='1';
+  btn.disabled=true;
+  btn.textContent='⏳ Publicando...';
+  const jsonStr=JSON.stringify(S).replace(/[^\x00-\x7F]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));
+  const newB64=btoa(jsonStr);
+  let html='<!DOCTYPE html>\n'+document.documentElement.outerHTML;
+  html=html.replace(/const PRELOADED_B64 = "[^"]*";/,`const PRELOADED_B64 = "${newB64}";`);
+  try{
+    if(!window.JSZip){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+        s.onload=res;s.onerror=rej;
+        document.head.appendChild(s);
+      });
+    }
+    const zip=new JSZip();
+    zip.file('index.html',html);
+    const zipBlob=await zip.generateAsync({type:'blob'});
+    const resp=await fetch(`https://api.netlify.com/api/v1/sites/${NETLIFY_SITE}/deploys`,{
+      method:'POST',
+      headers:{'Authorization':`Bearer ${NETLIFY_TOKEN}`,'Content-Type':'application/zip'},
+      body:zipBlob
+    });
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    btn.textContent='✅ Publicado!';
+    setTimeout(()=>{btn.textContent='🚀 Publicar';btn.disabled=false;btn.dataset.working='';},4000);
+    alert('✅ ¡Publicado! Los cambios ya se ven en:\nhttps://scintillating-torte-4e8437.netlify.app/?modo=lectura');
+  }catch(e){
+    console.warn('Publicar falló:',e);
+    const blob=new Blob([html],{type:'text/html'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='index.html';
+    a.click();
+    btn.textContent='🚀 Publicar';
+    btn.disabled=false;
+    btn.dataset.working='';
+    alert('Se descargó el index.html actualizado.\nCopialo a la carpeta APP La Fe y ejecutá deploy_netlify.ps1 para publicar.');
+  }
+}
+
+function exportarEstadoJSON(){
+  try{
+    const jsonStr=JSON.stringify(S,null,2);
+    const blob=new Blob([jsonStr],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='lafe_estado.json';
+    a.click();
+    alert('✅ Estado exportado como lafe_estado.json\nAhora ejecutá deploy_netlify.ps1 para publicar en Netlify.');
+  }catch(e){
+    alert('Error al exportar: '+e.message);
+  }
+}
 </script>
 </body>
 </html>
